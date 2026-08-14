@@ -189,7 +189,7 @@ export function RunnerClaimMarket({
           </div>
 
           {selectedPool && selectedNode ? (
-          <div className="runner-market-claim">
+            <div className="runner-market-claim">
               <>
                 <header>
                   <div>
@@ -299,7 +299,7 @@ export function RunnerClaimMarket({
                   </span>
                 </div>
               </>
-          </div>
+            </div>
           ) : null}
         </div>
       )}

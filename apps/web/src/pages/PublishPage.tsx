@@ -857,7 +857,6 @@ export function PublishPage() {
                 <strong>AP-TASK / V1</strong>
               </footer>
             </section>
-
           </div>
         ) : null}
 
@@ -1740,8 +1739,7 @@ export function PublishPage() {
                 className="button button-primary"
                 type="button"
                 disabled={
-                  loadingQuote ||
-                  (step === 3 && budget > (wallet?.purchasedAvailable || 0))
+                  loadingQuote || (step === 3 && budget > (wallet?.purchasedAvailable || 0))
                 }
                 onClick={() => void next()}
               >

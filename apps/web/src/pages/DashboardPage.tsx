@@ -68,48 +68,49 @@ export function DashboardPage() {
       <WalletGrid wallet={data.wallet} variant={activePools.length ? 'grid' : 'strip'} />
 
       {activePools.length ? (
-      <section className="dashboard-band">
-        <div className="network-pulse-card">
-          <div className="pulse-orbit" aria-hidden="true">
-            <span />
-            <span />
-            <RadioTower />
+        <section className="dashboard-band">
+          <div className="network-pulse-card">
+            <div className="pulse-orbit" aria-hidden="true">
+              <span />
+              <span />
+              <RadioTower />
+            </div>
+            <div>
+              <strong>{data.network.onlineNodes.toLocaleString('zh-CN')}</strong>
+              <p>
+                个 Runner 节点在线，其中 {data.network.busyNodes.toLocaleString('zh-CN')}{' '}
+                个正在执行。
+              </p>
+            </div>
+            <dl>
+              <div>
+                <dt>活跃任务池</dt>
+                <dd>{data.network.activePools.toLocaleString('zh-CN')}</dd>
+              </div>
+              <div>
+                <dt>等待 Units</dt>
+                <dd>{data.network.queuedUnits.toLocaleString('zh-CN')}</dd>
+              </div>
+              <div>
+                <dt>今日完成</dt>
+                <dd>{data.network.completedToday.toLocaleString('zh-CN')}</dd>
+              </div>
+            </dl>
           </div>
-          <div>
-            <strong>{data.network.onlineNodes.toLocaleString('zh-CN')}</strong>
-            <p>
-              个 Runner 节点在线，其中 {data.network.busyNodes.toLocaleString('zh-CN')} 个正在执行。
-            </p>
-          </div>
-          <dl>
-            <div>
-              <dt>活跃任务池</dt>
-              <dd>{data.network.activePools.toLocaleString('zh-CN')}</dd>
-            </div>
-            <div>
-              <dt>等待 Units</dt>
-              <dd>{data.network.queuedUnits.toLocaleString('zh-CN')}</dd>
-            </div>
-            <div>
-              <dt>今日完成</dt>
-              <dd>{data.network.completedToday.toLocaleString('zh-CN')}</dd>
-            </div>
-          </dl>
-        </div>
 
-        <div className="quick-actions">
-          <Link to="/app/pools/new">
-            <span className="quick-icon">
-              <Plus aria-hidden="true" />
-            </span>
-            <div>
-              <strong>发布任务池</strong>
-              <small>把数据切成独立 Units</small>
-            </div>
-            <ArrowRight aria-hidden="true" />
-          </Link>
-        </div>
-      </section>
+          <div className="quick-actions">
+            <Link to="/app/pools/new">
+              <span className="quick-icon">
+                <Plus aria-hidden="true" />
+              </span>
+              <div>
+                <strong>发布任务池</strong>
+                <small>把数据切成独立 Units</small>
+              </div>
+              <ArrowRight aria-hidden="true" />
+            </Link>
+          </div>
+        </section>
       ) : null}
 
       <section className="page-section">
@@ -139,17 +140,17 @@ export function DashboardPage() {
       </section>
 
       {activePools.length ? (
-      <aside className="privacy-strip">
-        <Sparkles aria-hidden="true" />
-        <strong>执行端默认只看见：</strong>
-        <span>公开摘要</span>
-        <span>Agent / 模型要求</span>
-        <span>进度</span>
-        <span>PULSE 奖励</span>
-        <span className="privacy-not">
-          <Server aria-hidden="true" /> 不显示任务内容与交付结果
-        </span>
-      </aside>
+        <aside className="privacy-strip">
+          <Sparkles aria-hidden="true" />
+          <strong>执行端默认只看见：</strong>
+          <span>公开摘要</span>
+          <span>Agent / 模型要求</span>
+          <span>进度</span>
+          <span>PULSE 奖励</span>
+          <span className="privacy-not">
+            <Server aria-hidden="true" /> 不显示任务内容与交付结果
+          </span>
+        </aside>
       ) : null}
     </div>
   );

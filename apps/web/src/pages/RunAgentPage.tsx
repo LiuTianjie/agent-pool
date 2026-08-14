@@ -179,278 +179,282 @@ export function RunAgentPage() {
       {paired ? (
         <details className="runner-setup-details">
           <summary>安装与领取命令</summary>
-      <section className="runner-intro">
-        <div className="runner-orbit" aria-hidden="true">
-          <span className="orbit orbit-one" />
-          <span className="orbit orbit-two" />
-          <div>
-            <Bot />
-          </div>
-          <i className="orbit-node node-one" />
-          <i className="orbit-node node-two" />
-          <i className="orbit-node node-three" />
-        </div>
-        <div>
-          <h2>
-            你的凭证留在本机。
-            <br />
-            能力进入 Pool。
-          </h2>
-          <p>
-            Runner 只启动本地 CLI，不读取或上传 Codex、Claude
-            的账户凭证。任务在全新会话和独立临时目录执行，默认不向主人 UI 展示输入与结果。
-          </p>
-          <CopyCommand command={INSTALL_COMMAND} />
-        </div>
-      </section>
-
-      <section className="runner-steps page-section">
-        <div className="section-bar">
-          <div>
-            <h2>安装、授权、基准、主动领取</h2>
-          </div>
-        </div>
-        <div className="runner-step-list">
-          <article>
-            <span className="runner-step-number">01</span>
-            <div className="runner-step-icon">
-              <TerminalSquare aria-hidden="true" />
+          <section className="runner-intro">
+            <div className="runner-orbit" aria-hidden="true">
+              <span className="orbit orbit-one" />
+              <span className="orbit orbit-two" />
+              <div>
+                <Bot />
+              </div>
+              <i className="orbit-node node-one" />
+              <i className="orbit-node node-two" />
+              <i className="orbit-node node-three" />
             </div>
             <div>
-              <h3>安装 Runner</h3>
-              <p>下载自包含的命令行程序。它以当前用户权限运行，不会安装或修改你的 Agent。</p>
+              <h2>
+                你的凭证留在本机。
+                <br />
+                能力进入 Pool。
+              </h2>
+              <p>
+                Runner 只启动本地 CLI，不读取或上传 Codex、Claude
+                的账户凭证。任务在全新会话和独立临时目录执行，默认不向主人 UI 展示输入与结果。
+              </p>
               <CopyCommand command={INSTALL_COMMAND} />
             </div>
-          </article>
-          <article>
-            <span className="runner-step-number">02</span>
-            <div className="runner-step-icon">
-              <KeyRound aria-hidden="true" />
-            </div>
-            <div>
-              <h3>连接 Agent Pool 账户</h3>
-              <p>CLI 会给出一次性设备码，在浏览器中确认这台设备。平台账户和模型账户彼此独立。</p>
-              <CopyCommand command={LOGIN_COMMAND} />
-            </div>
-          </article>
-          <article>
-            <span className="runner-step-number">03</span>
-            <div className="runner-step-icon">
-              <BadgeCheck aria-hidden="true" />
-            </div>
-            <div>
-              <h3>运行自托管能力基准</h3>
-              <p>
-                基准会在本机测量所声明 Agent /
-                模型组合的任务正确性、延迟与持续并发。它只是自托管正确性与性能证据，不验证或证明底层模型身份。
-              </p>
-              <CopyCommand command={BENCHMARK_COMMAND} />
-              <small>
-                把 <code>&lt;exact-model&gt;</code> 换成 CLI 实际支持的精确模型标识；Claude 节点把
-                <code>--agent codex</code> 改为 <code>--agent claude</code>。
-              </small>
-            </div>
-          </article>
-          <article>
-            <span className="runner-step-number">04</span>
-            <div className="runner-step-icon">
-              <RadioTower aria-hidden="true" />
-            </div>
-            <div>
-              <h3>主动领取一批</h3>
-              <p>
-                在上方市场选择具体 Runner、Pool 和数量后运行生成的命令。CLI 会创建短期定量
-                Grant，执行完这一批即退出；不会自动换模型或继续扫单。Official Cell 会生成只含 Pool
-                与数量的专用命令，其 Agent、model 与 Webhook 权限来自 Cell 配置。
-              </p>
-              <CopyCommand command={CLAIM_COMMAND} />
-              <div className="runner-webhook-optin">
-                <header>
-                  <Webhook aria-hidden="true" />
-                  <div>
-                    <strong>可选：允许直达 Webhook</strong>
-                  </div>
-                </header>
-                <p>
-                  Community Runner 领取 Webhook Pool 时必须显式加 <code>--allow-webhooks</code>
-                  。Official Runner 则只匹配已在 Cell 配置中开启 Webhook 的节点，Official
-                  命令不接受这个参数。Runner 会直接访问发布者的 callback
-                  URL，因此发布者可观察你的出口 IP；URL 也可能接触发布者控制的网络设施。
-                </p>
-                <CopyCommand command={WEBHOOK_CLAIM_COMMAND} />
-                <span>
-                  <AlertTriangle aria-hidden="true" /> 默认关闭；不了解网络暴露边界时不要开启。
-                </span>
+          </section>
+
+          <section className="runner-steps page-section">
+            <div className="section-bar">
+              <div>
+                <h2>安装、授权、基准、主动领取</h2>
               </div>
             </div>
-          </article>
-        </div>
-      </section>
+            <div className="runner-step-list">
+              <article>
+                <span className="runner-step-number">01</span>
+                <div className="runner-step-icon">
+                  <TerminalSquare aria-hidden="true" />
+                </div>
+                <div>
+                  <h3>安装 Runner</h3>
+                  <p>下载自包含的命令行程序。它以当前用户权限运行，不会安装或修改你的 Agent。</p>
+                  <CopyCommand command={INSTALL_COMMAND} />
+                </div>
+              </article>
+              <article>
+                <span className="runner-step-number">02</span>
+                <div className="runner-step-icon">
+                  <KeyRound aria-hidden="true" />
+                </div>
+                <div>
+                  <h3>连接 Agent Pool 账户</h3>
+                  <p>
+                    CLI 会给出一次性设备码，在浏览器中确认这台设备。平台账户和模型账户彼此独立。
+                  </p>
+                  <CopyCommand command={LOGIN_COMMAND} />
+                </div>
+              </article>
+              <article>
+                <span className="runner-step-number">03</span>
+                <div className="runner-step-icon">
+                  <BadgeCheck aria-hidden="true" />
+                </div>
+                <div>
+                  <h3>运行自托管能力基准</h3>
+                  <p>
+                    基准会在本机测量所声明 Agent /
+                    模型组合的任务正确性、延迟与持续并发。它只是自托管正确性与性能证据，不验证或证明底层模型身份。
+                  </p>
+                  <CopyCommand command={BENCHMARK_COMMAND} />
+                  <small>
+                    把 <code>&lt;exact-model&gt;</code> 换成 CLI 实际支持的精确模型标识；Claude
+                    节点把
+                    <code>--agent codex</code> 改为 <code>--agent claude</code>。
+                  </small>
+                </div>
+              </article>
+              <article>
+                <span className="runner-step-number">04</span>
+                <div className="runner-step-icon">
+                  <RadioTower aria-hidden="true" />
+                </div>
+                <div>
+                  <h3>主动领取一批</h3>
+                  <p>
+                    在上方市场选择具体 Runner、Pool 和数量后运行生成的命令。CLI 会创建短期定量
+                    Grant，执行完这一批即退出；不会自动换模型或继续扫单。Official Cell 会生成只含
+                    Pool 与数量的专用命令，其 Agent、model 与 Webhook 权限来自 Cell 配置。
+                  </p>
+                  <CopyCommand command={CLAIM_COMMAND} />
+                  <div className="runner-webhook-optin">
+                    <header>
+                      <Webhook aria-hidden="true" />
+                      <div>
+                        <strong>可选：允许直达 Webhook</strong>
+                      </div>
+                    </header>
+                    <p>
+                      Community Runner 领取 Webhook Pool 时必须显式加 <code>--allow-webhooks</code>
+                      。Official Runner 则只匹配已在 Cell 配置中开启 Webhook 的节点，Official
+                      命令不接受这个参数。Runner 会直接访问发布者的 callback
+                      URL，因此发布者可观察你的出口 IP；URL 也可能接触发布者控制的网络设施。
+                    </p>
+                    <CopyCommand command={WEBHOOK_CLAIM_COMMAND} />
+                    <span>
+                      <AlertTriangle aria-hidden="true" /> 默认关闭；不了解网络暴露边界时不要开启。
+                    </span>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </section>
 
-      <section className="sealed-boundary">
-        <div>
-          <LockKeyhole aria-hidden="true" />
-          <strong>默认密封线程</strong>
-        </div>
-        <p>
-          Runner 默认不把任务输入、秘密指令和交付结果打印到主人界面或持久日志；每个 Unit
-          使用新会话和独立临时目录，结束后清理。
-        </p>
-        <div className="boundary-flow" aria-label="可见性边界">
-          <span>
-            <EyeOff aria-hidden="true" /> 主人界面
-          </span>
-          <i />
-          <strong>公开元数据 / 状态 / 奖励</strong>
-          <i className="blocked" />
-          <span>
-            <ShieldCheck aria-hidden="true" /> 密封任务内容
-          </span>
-        </div>
-        <aside>
-          <strong>真实安全边界：</strong>普通自有机器上的隔离是 best-effort。拥有
-          root、调试或内存检查权限的恶意宿主仍可能观察进程；平台无法在普通机器上提供宿主不可见的密码学保证。
-        </aside>
-      </section>
-
+          <section className="sealed-boundary">
+            <div>
+              <LockKeyhole aria-hidden="true" />
+              <strong>默认密封线程</strong>
+            </div>
+            <p>
+              Runner 默认不把任务输入、秘密指令和交付结果打印到主人界面或持久日志；每个 Unit
+              使用新会话和独立临时目录，结束后清理。
+            </p>
+            <div className="boundary-flow" aria-label="可见性边界">
+              <span>
+                <EyeOff aria-hidden="true" /> 主人界面
+              </span>
+              <i />
+              <strong>公开元数据 / 状态 / 奖励</strong>
+              <i className="blocked" />
+              <span>
+                <ShieldCheck aria-hidden="true" /> 密封任务内容
+              </span>
+            </div>
+            <aside>
+              <strong>真实安全边界：</strong>普通自有机器上的隔离是 best-effort。拥有
+              root、调试或内存检查权限的恶意宿主仍可能观察进程；平台无法在普通机器上提供宿主不可见的密码学保证。
+            </aside>
+          </section>
         </details>
       ) : (
-      <div className="runner-setup-unpaired">
-      <section className="runner-intro">
-        <div className="runner-orbit" aria-hidden="true">
-          <span className="orbit orbit-one" />
-          <span className="orbit orbit-two" />
-          <div>
-            <Bot />
-          </div>
-          <i className="orbit-node node-one" />
-          <i className="orbit-node node-two" />
-          <i className="orbit-node node-three" />
-        </div>
-        <div>
-          <h2>
-            你的凭证留在本机。
-            <br />
-            能力进入 Pool。
-          </h2>
-          <p>
-            Runner 只启动本地 CLI，不读取或上传 Codex、Claude
-            的账户凭证。任务在全新会话和独立临时目录执行，默认不向主人 UI 展示输入与结果。
-          </p>
-          <CopyCommand command={INSTALL_COMMAND} />
-        </div>
-      </section>
-
-      <section className="runner-steps page-section">
-        <div className="section-bar">
-          <div>
-            <h2>安装、授权、基准、主动领取</h2>
-          </div>
-        </div>
-        <div className="runner-step-list">
-          <article>
-            <span className="runner-step-number">01</span>
-            <div className="runner-step-icon">
-              <TerminalSquare aria-hidden="true" />
+        <div className="runner-setup-unpaired">
+          <section className="runner-intro">
+            <div className="runner-orbit" aria-hidden="true">
+              <span className="orbit orbit-one" />
+              <span className="orbit orbit-two" />
+              <div>
+                <Bot />
+              </div>
+              <i className="orbit-node node-one" />
+              <i className="orbit-node node-two" />
+              <i className="orbit-node node-three" />
             </div>
             <div>
-              <h3>安装 Runner</h3>
-              <p>下载自包含的命令行程序。它以当前用户权限运行，不会安装或修改你的 Agent。</p>
+              <h2>
+                你的凭证留在本机。
+                <br />
+                能力进入 Pool。
+              </h2>
+              <p>
+                Runner 只启动本地 CLI，不读取或上传 Codex、Claude
+                的账户凭证。任务在全新会话和独立临时目录执行，默认不向主人 UI 展示输入与结果。
+              </p>
               <CopyCommand command={INSTALL_COMMAND} />
             </div>
-          </article>
-          <article>
-            <span className="runner-step-number">02</span>
-            <div className="runner-step-icon">
-              <KeyRound aria-hidden="true" />
-            </div>
-            <div>
-              <h3>连接 Agent Pool 账户</h3>
-              <p>CLI 会给出一次性设备码，在浏览器中确认这台设备。平台账户和模型账户彼此独立。</p>
-              <CopyCommand command={LOGIN_COMMAND} />
-            </div>
-          </article>
-          <article>
-            <span className="runner-step-number">03</span>
-            <div className="runner-step-icon">
-              <BadgeCheck aria-hidden="true" />
-            </div>
-            <div>
-              <h3>运行自托管能力基准</h3>
-              <p>
-                基准会在本机测量所声明 Agent /
-                模型组合的任务正确性、延迟与持续并发。它只是自托管正确性与性能证据，不验证或证明底层模型身份。
-              </p>
-              <CopyCommand command={BENCHMARK_COMMAND} />
-              <small>
-                把 <code>&lt;exact-model&gt;</code> 换成 CLI 实际支持的精确模型标识；Claude 节点把
-                <code>--agent codex</code> 改为 <code>--agent claude</code>。
-              </small>
-            </div>
-          </article>
-          <article>
-            <span className="runner-step-number">04</span>
-            <div className="runner-step-icon">
-              <RadioTower aria-hidden="true" />
-            </div>
-            <div>
-              <h3>主动领取一批</h3>
-              <p>
-                在上方市场选择具体 Runner、Pool 和数量后运行生成的命令。CLI 会创建短期定量
-                Grant，执行完这一批即退出；不会自动换模型或继续扫单。Official Cell 会生成只含 Pool
-                与数量的专用命令，其 Agent、model 与 Webhook 权限来自 Cell 配置。
-              </p>
-              <CopyCommand command={CLAIM_COMMAND} />
-              <div className="runner-webhook-optin">
-                <header>
-                  <Webhook aria-hidden="true" />
-                  <div>
-                    <strong>可选：允许直达 Webhook</strong>
-                  </div>
-                </header>
-                <p>
-                  Community Runner 领取 Webhook Pool 时必须显式加 <code>--allow-webhooks</code>
-                  。Official Runner 则只匹配已在 Cell 配置中开启 Webhook 的节点，Official
-                  命令不接受这个参数。Runner 会直接访问发布者的 callback
-                  URL，因此发布者可观察你的出口 IP；URL 也可能接触发布者控制的网络设施。
-                </p>
-                <CopyCommand command={WEBHOOK_CLAIM_COMMAND} />
-                <span>
-                  <AlertTriangle aria-hidden="true" /> 默认关闭；不了解网络暴露边界时不要开启。
-                </span>
+          </section>
+
+          <section className="runner-steps page-section">
+            <div className="section-bar">
+              <div>
+                <h2>安装、授权、基准、主动领取</h2>
               </div>
             </div>
-          </article>
-        </div>
-      </section>
+            <div className="runner-step-list">
+              <article>
+                <span className="runner-step-number">01</span>
+                <div className="runner-step-icon">
+                  <TerminalSquare aria-hidden="true" />
+                </div>
+                <div>
+                  <h3>安装 Runner</h3>
+                  <p>下载自包含的命令行程序。它以当前用户权限运行，不会安装或修改你的 Agent。</p>
+                  <CopyCommand command={INSTALL_COMMAND} />
+                </div>
+              </article>
+              <article>
+                <span className="runner-step-number">02</span>
+                <div className="runner-step-icon">
+                  <KeyRound aria-hidden="true" />
+                </div>
+                <div>
+                  <h3>连接 Agent Pool 账户</h3>
+                  <p>
+                    CLI 会给出一次性设备码，在浏览器中确认这台设备。平台账户和模型账户彼此独立。
+                  </p>
+                  <CopyCommand command={LOGIN_COMMAND} />
+                </div>
+              </article>
+              <article>
+                <span className="runner-step-number">03</span>
+                <div className="runner-step-icon">
+                  <BadgeCheck aria-hidden="true" />
+                </div>
+                <div>
+                  <h3>运行自托管能力基准</h3>
+                  <p>
+                    基准会在本机测量所声明 Agent /
+                    模型组合的任务正确性、延迟与持续并发。它只是自托管正确性与性能证据，不验证或证明底层模型身份。
+                  </p>
+                  <CopyCommand command={BENCHMARK_COMMAND} />
+                  <small>
+                    把 <code>&lt;exact-model&gt;</code> 换成 CLI 实际支持的精确模型标识；Claude
+                    节点把
+                    <code>--agent codex</code> 改为 <code>--agent claude</code>。
+                  </small>
+                </div>
+              </article>
+              <article>
+                <span className="runner-step-number">04</span>
+                <div className="runner-step-icon">
+                  <RadioTower aria-hidden="true" />
+                </div>
+                <div>
+                  <h3>主动领取一批</h3>
+                  <p>
+                    在上方市场选择具体 Runner、Pool 和数量后运行生成的命令。CLI 会创建短期定量
+                    Grant，执行完这一批即退出；不会自动换模型或继续扫单。Official Cell 会生成只含
+                    Pool 与数量的专用命令，其 Agent、model 与 Webhook 权限来自 Cell 配置。
+                  </p>
+                  <CopyCommand command={CLAIM_COMMAND} />
+                  <div className="runner-webhook-optin">
+                    <header>
+                      <Webhook aria-hidden="true" />
+                      <div>
+                        <strong>可选：允许直达 Webhook</strong>
+                      </div>
+                    </header>
+                    <p>
+                      Community Runner 领取 Webhook Pool 时必须显式加 <code>--allow-webhooks</code>
+                      。Official Runner 则只匹配已在 Cell 配置中开启 Webhook 的节点，Official
+                      命令不接受这个参数。Runner 会直接访问发布者的 callback
+                      URL，因此发布者可观察你的出口 IP；URL 也可能接触发布者控制的网络设施。
+                    </p>
+                    <CopyCommand command={WEBHOOK_CLAIM_COMMAND} />
+                    <span>
+                      <AlertTriangle aria-hidden="true" /> 默认关闭；不了解网络暴露边界时不要开启。
+                    </span>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </section>
 
-      <section className="sealed-boundary">
-        <div>
-          <LockKeyhole aria-hidden="true" />
-          <strong>默认密封线程</strong>
+          <section className="sealed-boundary">
+            <div>
+              <LockKeyhole aria-hidden="true" />
+              <strong>默认密封线程</strong>
+            </div>
+            <p>
+              Runner 默认不把任务输入、秘密指令和交付结果打印到主人界面或持久日志；每个 Unit
+              使用新会话和独立临时目录，结束后清理。
+            </p>
+            <div className="boundary-flow" aria-label="可见性边界">
+              <span>
+                <EyeOff aria-hidden="true" /> 主人界面
+              </span>
+              <i />
+              <strong>公开元数据 / 状态 / 奖励</strong>
+              <i className="blocked" />
+              <span>
+                <ShieldCheck aria-hidden="true" /> 密封任务内容
+              </span>
+            </div>
+            <aside>
+              <strong>真实安全边界：</strong>普通自有机器上的隔离是 best-effort。拥有
+              root、调试或内存检查权限的恶意宿主仍可能观察进程；平台无法在普通机器上提供宿主不可见的密码学保证。
+            </aside>
+          </section>
         </div>
-        <p>
-          Runner 默认不把任务输入、秘密指令和交付结果打印到主人界面或持久日志；每个 Unit
-          使用新会话和独立临时目录，结束后清理。
-        </p>
-        <div className="boundary-flow" aria-label="可见性边界">
-          <span>
-            <EyeOff aria-hidden="true" /> 主人界面
-          </span>
-          <i />
-          <strong>公开元数据 / 状态 / 奖励</strong>
-          <i className="blocked" />
-          <span>
-            <ShieldCheck aria-hidden="true" /> 密封任务内容
-          </span>
-        </div>
-        <aside>
-          <strong>真实安全边界：</strong>普通自有机器上的隔离是 best-effort。拥有
-          root、调试或内存检查权限的恶意宿主仍可能观察进程；平台无法在普通机器上提供宿主不可见的密码学保证。
-        </aside>
-      </section>
-      </div>
-
       )}
 
       <section className="page-section">
