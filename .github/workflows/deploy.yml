@@ -17,7 +17,6 @@ env:
   LUMA_CONTROL_URL: ${{ vars.LUMA_CONTROL_URL }}
   LUMA_DEPLOY_TOKEN: ${{ secrets.LUMA_DEPLOY_TOKEN }}
   LUMA_VERSION: 0.1.271
-  GHCR_PULL_THROUGH_HOST: ghcr.nju.edu.cn
 
 jobs:
   verify-build-deploy:
@@ -97,15 +96,9 @@ jobs:
         run: |
           set -euo pipefail
           canonical_image="${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}"
-          pull_through_image="${GHCR_PULL_THROUGH_HOST}/${{ steps.image.outputs.name }}"
-          pull_through_image="${pull_through_image#${GHCR_PULL_THROUGH_HOST}/ghcr.io/}@${{ steps.build.outputs.digest }}"
-
-          # The mirror is transport only. The GHCR-produced digest remains
-          # authoritative and the OCI client verifies it while pulling.
           node scripts/render-ci-deployment.mjs \
-            "$pull_through_image"
+            "$canonical_image"
           echo "canonical=${canonical_image}" >> "$GITHUB_OUTPUT"
-          echo "pull-through=${pull_through_image}" >> "$GITHUB_OUTPUT"
 
       - name: Authorize Luma to copy the GHCR image
         shell: bash
@@ -147,8 +140,7 @@ jobs:
           {
             echo "### Agent Pool production"
             echo ""
-            echo "- Canonical image: \`${{ steps.deployment-image.outputs.canonical }}\`"
-            echo "- Builder pull-through: \`${{ steps.deployment-image.outputs.pull-through }}\`"
+            echo "- Image: \`${{ steps.deployment-image.outputs.canonical }}\`"
             echo "- Site: https://agentpool.itool.tech"
             echo "- Storage: manager-local ReadWriteOnce volume"
           } >> "$GITHUB_STEP_SUMMARY"
