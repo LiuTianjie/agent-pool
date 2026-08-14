@@ -97,13 +97,11 @@ export function RunnerClaimMarket({
             <Target />
           </span>
           <span>
-            <small>RUNNER MARKET / OWNER TRIGGER</small>
             <h2>选一台 Runner，抢这一批</h2>
           </span>
         </div>
         <div className="runner-market-signal" aria-live="polite">
           <span aria-hidden="true" />
-          <small>MATCHED POOLS</small>
           <strong>{matchedPools.length.toLocaleString('zh-CN')}</strong>
         </div>
       </header>

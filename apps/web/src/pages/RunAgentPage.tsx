@@ -185,14 +185,12 @@ export function RunAgentPage() {
           <span className="orbit orbit-two" />
           <div>
             <Bot />
-            <span>LOCAL</span>
           </div>
           <i className="orbit-node node-one" />
           <i className="orbit-node node-two" />
           <i className="orbit-node node-three" />
         </div>
         <div>
-          <span className="section-index">ONE COMMAND AWAY</span>
           <h2>
             你的凭证留在本机。
             <br />
@@ -209,7 +207,6 @@ export function RunAgentPage() {
       <section className="runner-steps page-section">
         <div className="section-bar">
           <div>
-            <span className="section-index">SETUP / 4 STEPS</span>
             <h2>安装、授权、基准、主动领取</h2>
           </div>
         </div>
@@ -272,7 +269,6 @@ export function RunAgentPage() {
                   <Webhook aria-hidden="true" />
                   <div>
                     <strong>可选：允许直达 Webhook</strong>
-                    <small>EXPERIMENTAL / EXPLICIT OPT-IN</small>
                   </div>
                 </header>
                 <p>
@@ -319,20 +315,19 @@ export function RunAgentPage() {
 
         </details>
       ) : (
+      <div className="runner-setup-unpaired">
       <section className="runner-intro">
         <div className="runner-orbit" aria-hidden="true">
           <span className="orbit orbit-one" />
           <span className="orbit orbit-two" />
           <div>
             <Bot />
-            <span>LOCAL</span>
           </div>
           <i className="orbit-node node-one" />
           <i className="orbit-node node-two" />
           <i className="orbit-node node-three" />
         </div>
         <div>
-          <span className="section-index">ONE COMMAND AWAY</span>
           <h2>
             你的凭证留在本机。
             <br />
@@ -349,7 +344,6 @@ export function RunAgentPage() {
       <section className="runner-steps page-section">
         <div className="section-bar">
           <div>
-            <span className="section-index">SETUP / 4 STEPS</span>
             <h2>安装、授权、基准、主动领取</h2>
           </div>
         </div>
@@ -412,7 +406,6 @@ export function RunAgentPage() {
                   <Webhook aria-hidden="true" />
                   <div>
                     <strong>可选：允许直达 Webhook</strong>
-                    <small>EXPERIMENTAL / EXPLICIT OPT-IN</small>
                   </div>
                 </header>
                 <p>
@@ -456,6 +449,7 @@ export function RunAgentPage() {
           root、调试或内存检查权限的恶意宿主仍可能观察进程；平台无法在普通机器上提供宿主不可见的密码学保证。
         </aside>
       </section>
+      </div>
 
       )}
 

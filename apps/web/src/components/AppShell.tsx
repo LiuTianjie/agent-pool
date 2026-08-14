@@ -51,7 +51,6 @@ export function AppShell() {
       <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-top">
           <Brand compact />
-          <span className="environment-tag">BETA NETWORK</span>
         </div>
         <nav className="app-nav" aria-label="主要导航">
           {NAV.map(({ to, label, icon: Icon, end }) => (

@@ -76,7 +76,6 @@ export function DashboardPage() {
             <RadioTower />
           </div>
           <div>
-            <span className="mono-label">NETWORK PULSE</span>
             <strong>{data.network.onlineNodes.toLocaleString('zh-CN')}</strong>
             <p>
               个 Runner 节点在线，其中 {data.network.busyNodes.toLocaleString('zh-CN')} 个正在执行。
@@ -118,9 +117,7 @@ export function DashboardPage() {
           <div>
             <h2>正在发布的任务池</h2>
           </div>
-          <Link className="text-link" to="/app/pools/new">
-            新建 <ArrowRight aria-hidden="true" />
-          </Link>
+          <span />
         </div>
         {activePools.length ? (
           <div className="pool-list">
