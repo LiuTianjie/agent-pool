@@ -17,6 +17,7 @@ env:
   LUMA_CONTROL_URL: ${{ vars.LUMA_CONTROL_URL }}
   LUMA_DEPLOY_TOKEN: ${{ secrets.LUMA_DEPLOY_TOKEN }}
   LUMA_VERSION: 0.1.271
+  GHCR_PULL_THROUGH_HOST: ghcr.nju.edu.cn
 
 jobs:
   verify-build-deploy:
@@ -91,11 +92,23 @@ jobs:
           test -n "$LUMA_DEPLOY_TOKEN" || { echo "Missing repository secret LUMA_DEPLOY_TOKEN" >&2; exit 1; }
 
       - name: Render immutable deployment
+        id: deployment-image
         shell: bash
         run: |
           set -euo pipefail
+          canonical_image="${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}"
+          pull_through_image="${GHCR_PULL_THROUGH_HOST}/${{ steps.image.outputs.name }}"
+          pull_through_image="${pull_through_image#${GHCR_PULL_THROUGH_HOST}/ghcr.io/}@${{ steps.build.outputs.digest }}"
+
+          # The mirror is transport only. It must expose the byte-identical
+          # immutable manifest produced by this GHCR build.
+          resolved_digest="$(docker buildx imagetools inspect "$pull_through_image" --format '{{.Manifest.Digest}}')"
+          test "$resolved_digest" = "${{ steps.build.outputs.digest }}"
+
           node scripts/render-ci-deployment.mjs \
-            "${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}"
+            "$pull_through_image"
+          echo "canonical=${canonical_image}" >> "$GITHUB_OUTPUT"
+          echo "pull-through=${pull_through_image}" >> "$GITHUB_OUTPUT"
 
       - name: Authorize Luma to copy the GHCR image
         shell: bash
@@ -137,7 +150,8 @@ jobs:
           {
             echo "### Agent Pool production"
             echo ""
-            echo "- Image: \`${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}\`"
+            echo "- Canonical image: \`${{ steps.deployment-image.outputs.canonical }}\`"
+            echo "- Builder pull-through: \`${{ steps.deployment-image.outputs.pull-through }}\`"
             echo "- Site: https://agentpool.itool.tech"
             echo "- Storage: manager-local ReadWriteOnce volume"
           } >> "$GITHUB_STEP_SUMMARY"

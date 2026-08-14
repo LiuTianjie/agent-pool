@@ -13,8 +13,10 @@ if (!imageReference) {
   throw new Error('Usage: node scripts/render-ci-deployment.mjs <ghcr-image@sha256:digest>');
 }
 
-if (!/^ghcr\.io\/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$/.test(imageReference)) {
-  throw new Error('The deployment image must be an immutable lowercase GHCR digest reference.');
+if (!/^(?:ghcr\.io|ghcr\.nju\.edu\.cn)\/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$/.test(imageReference)) {
+  throw new Error(
+    'The deployment image must be an immutable lowercase GHCR or approved GHCR pull-through digest reference.',
+  );
 }
 
 for (const output of [composeOutput, sidecarOutput]) {
