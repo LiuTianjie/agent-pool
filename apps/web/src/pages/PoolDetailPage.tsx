@@ -25,13 +25,7 @@ import { InlineError, LoadingState } from '../components/LoadingState';
 import { LiveStatus, PoolStatus } from '../components/Status';
 import { useLiveEvents } from '../hooks/useLiveEvents';
 import { api, ApiError } from '../lib/api';
-import {
-  credits,
-  duration,
-  fullDateTime,
-  percent,
-  relativeTime,
-} from '../lib/format';
+import { credits, duration, fullDateTime, percent, relativeTime } from '../lib/format';
 import type { PoolDetail, PoolUnit, UnitStatus } from '../lib/types';
 import { webhookHostname } from '../lib/taskContract';
 import { printableValue } from '../lib/units';
@@ -416,10 +410,10 @@ export function PoolDetailPage() {
                   ) : null}
                   <dl>
                     {capsule.inputDescription && capsule.inputDescription !== pool.publicSummary ? (
-                    <div>
-                      <dt>输入</dt>
-                      <dd>{capsule.inputDescription}</dd>
-                    </div>
+                      <div>
+                        <dt>输入</dt>
+                        <dd>{capsule.inputDescription}</dd>
+                      </div>
                     ) : null}
                     <div>
                       <dt>输出</dt>
