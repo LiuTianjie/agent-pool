@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   Clock3,
   Cpu,
-  Gauge,
   RadioTower,
   RefreshCcw,
   ServerCog,
@@ -195,8 +194,8 @@ export function RunnerClaimMarket({
             ) : null}
           </div>
 
+          {selectedPool && selectedNode ? (
           <div className="runner-market-claim">
-            {selectedPool && selectedNode ? (
               <>
                 <header>
                   <div>
@@ -306,14 +305,8 @@ export function RunnerClaimMarket({
                   </span>
                 </div>
               </>
-            ) : (
-              <div className="runner-market-placeholder">
-                <Gauge aria-hidden="true" />
-                <strong>等待精确匹配</strong>
-                <span>选择一台有有效 benchmark 的 Runner 后，这里才会生成真实 Claim 命令。</span>
-              </div>
-            )}
           </div>
+          ) : null}
         </div>
       )}
     </section>

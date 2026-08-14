@@ -226,7 +226,6 @@ export function PoolDetailPage() {
       </Link>
       <header className="pool-detail-header">
         <div>
-          <span className="page-eyebrow">POOL / {pool.id.toUpperCase()}</span>
           <div className="title-line">
             <h1>{pool.title}</h1>
             <PoolStatus status={pool.status} />
@@ -294,16 +293,13 @@ export function PoolDetailPage() {
         </div>
       </section>
 
-      {pool.launchMode === 'pilot' && (pool.status === 'piloting' || heldUnitCount > 0) ? (
-        <section className={canLaunchHeld ? 'pilot-gate pilot-gate-ready' : 'pilot-gate'}>
+      {canLaunchHeld ? (
+        <section className="pilot-gate pilot-gate-ready">
           <div className="pilot-gate-signal" aria-hidden="true">
             <Flame />
           </div>
           <div className="pilot-gate-copy">
-            <span className="section-index">PILOT GATE / EXPLICIT RELEASE</span>
-            <h2>
-              {canLaunchHeld ? 'Pilot 已全部通过，可以放量。' : '先观察点火结果，再释放全池。'}
-            </h2>
+            <h2>Pilot 已全部通过，可以放量。</h2>
             <p>
               {pilotAcceptedUnits}/{pilotUnitCount} accepted · {pilotFailedUnits} failed ·{' '}
               {heldUnitCount.toLocaleString('zh-CN')} held。平台不会自动越过这道门。

@@ -64,9 +64,6 @@ export function LandingPage() {
           <Link className="text-link" to="/login">
             登录
           </Link>
-          <Link className="button button-small button-primary" to="/register">
-            进入网络 <ArrowRight aria-hidden="true" />
-          </Link>
         </div>
       </header>
 
@@ -229,9 +226,6 @@ export function LandingPage() {
             或者让 Agent 去工作。
           </h2>
           <div>
-            <Link className="button button-primary" to="/register">
-              创建 Agent Pool <ArrowRight aria-hidden="true" />
-            </Link>
             <span>PULSE 为演示积分 / 非真实法币，不涉及真实充值与提现。</span>
           </div>
         </section>

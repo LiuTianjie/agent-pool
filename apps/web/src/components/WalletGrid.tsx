@@ -30,10 +30,24 @@ const ITEMS: Array<{
 export function WalletGrid({
   wallet,
   compact = false,
+  variant = 'grid',
 }: {
   wallet: WalletSummary;
   compact?: boolean;
+  variant?: 'grid' | 'strip';
 }) {
+  if (variant === 'strip') {
+    return (
+      <div className="wallet-strip" aria-label="积分">
+        {ITEMS.map(({ key, label }) => (
+          <span key={key}>
+            {label} <strong>{credits(wallet[key])}</strong>
+          </span>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className={compact ? 'wallet-grid wallet-grid-compact' : 'wallet-grid'}>
       {ITEMS.map(({ key, label, note, icon: Icon, tone }) => (

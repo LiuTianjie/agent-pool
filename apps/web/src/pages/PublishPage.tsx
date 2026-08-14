@@ -860,36 +860,6 @@ export function PublishPage() {
               </footer>
             </section>
 
-            <aside className="capsule-compiler-peek">
-              <span className="section-index">当前是否说清楚</span>
-              <h2>Agent 现在能直接开工吗？</h2>
-              <p>这里会随填写进度更新，帮你检查目标、输入、结果和示例是否齐全。</p>
-              <dl>
-                <div>
-                  <dt>目标</dt>
-                  <dd>{goal.trim() ? '已定义' : '等待输入'}</dd>
-                </div>
-                <div>
-                  <dt>输入 / 输出</dt>
-                  <dd>
-                    {inputDescription.trim() && outputDescription.trim() ? '边界清晰' : '未完成'}
-                  </dd>
-                </div>
-                <div>
-                  <dt>示例</dt>
-                  <dd>
-                    {examples.filter((item) => item.input.trim() && item.output.trim()).length}
-                  </dd>
-                </div>
-                <div>
-                  <dt>约束</dt>
-                  <dd>{constraints.length}</dd>
-                </div>
-              </dl>
-              <p className="host-limit-note">
-                普通个人电脑只能尽力隔离任务；如果设备已被管理员级恶意程序控制，运行中的内容仍可能被看到。
-              </p>
-            </aside>
           </div>
         ) : null}
 
@@ -1533,15 +1503,11 @@ export function PublishPage() {
                       <dd>{credits(wallet?.purchasedAvailable || 0)}</dd>
                     </div>
                   </dl>
-                  {budget > (wallet?.purchasedAvailable || 0) ? (
-                    <p className="budget-warning">
-                      <AlertTriangle aria-hidden="true" /> PULSE 不足
-                    </p>
-                  ) : (
+                  {budget <= (wallet?.purchasedAvailable || 0) ? (
                     <p className="budget-ok">
                       <Check aria-hidden="true" /> 发布时锁定全部预算，试跑后由你决定是否继续
                     </p>
-                  )}
+                  ) : null}
                 </aside>
               </div>
             </section>
@@ -1766,11 +1732,19 @@ export function PublishPage() {
                   ? `首先发布 ${pilotUnits} 条试跑任务`
                   : '将立即开放全部任务'}
             </span>
+            {step === 3 && budget > (wallet?.purchasedAvailable || 0) ? (
+              <p className="budget-warning wizard-inline-warning">
+                <AlertTriangle aria-hidden="true" /> PULSE 不足
+              </p>
+            ) : null}
             {step < 4 ? (
               <button
                 className="button button-primary"
                 type="button"
-                disabled={loadingQuote}
+                disabled={
+                  loadingQuote ||
+                  (step === 3 && budget > (wallet?.purchasedAvailable || 0))
+                }
                 onClick={() => void next()}
               >
                 {loadingQuote ? '正在检查可用 Runner…' : step === 3 ? '检查并继续' : '继续'}{' '}
