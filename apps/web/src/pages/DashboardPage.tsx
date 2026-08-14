@@ -138,6 +138,7 @@ export function DashboardPage() {
         )}
       </section>
 
+      {activePools.length ? (
       <aside className="privacy-strip">
         <Sparkles aria-hidden="true" />
         <strong>执行端默认只看见：</strong>
@@ -149,6 +150,7 @@ export function DashboardPage() {
           <Server aria-hidden="true" /> 不显示任务内容与交付结果
         </span>
       </aside>
+      ) : null}
     </div>
   );
 }

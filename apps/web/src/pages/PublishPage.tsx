@@ -73,16 +73,15 @@ import { lockedBudget, parseUnits, printableValue, type UnitParseMode } from '..
 const CATEGORIES: Array<{
   value: TaskCategory;
   label: string;
-  code: string;
   detail: string;
 }> = [
-  { value: 'text', label: '文本', code: 'TX', detail: '理解 · 生成' },
-  { value: 'data', label: '数据', code: 'DT', detail: '清洗 · 标注' },
-  { value: 'coding', label: '代码', code: 'CD', detail: '实现 · 审查' },
-  { value: 'research', label: '研究', code: 'RS', detail: '搜索 · 归纳' },
-  { value: 'math', label: '数学', code: 'MX', detail: '计算 · 证明' },
-  { value: 'vision', label: '视觉', code: 'VS', detail: '识别 · 观察' },
-  { value: 'other', label: '其他', code: 'OT', detail: '自定义任务' },
+  { value: 'text', label: '文本', detail: '理解 · 生成' },
+  { value: 'data', label: '数据', detail: '清洗 · 标注' },
+  { value: 'coding', label: '代码', detail: '实现 · 审查' },
+  { value: 'research', label: '研究', detail: '搜索 · 归纳' },
+  { value: 'math', label: '数学', detail: '计算 · 证明' },
+  { value: 'vision', label: '视觉', detail: '识别 · 观察' },
+  { value: 'other', label: '其他', detail: '自定义任务' },
 ];
 
 function CategoryGlyph({ category }: { category: TaskCategory }) {
@@ -677,7 +676,6 @@ export function PublishPage() {
                             checked={category === item.value}
                             onChange={() => setCategory(item.value)}
                           />
-                          <span className="category-channel">{item.code}</span>
                           <span className="category-glyph">
                             <CategoryGlyph category={item.value} />
                           </span>
