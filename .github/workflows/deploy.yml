@@ -102,8 +102,18 @@ jobs:
 
           # The mirror is transport only. It must expose the byte-identical
           # immutable manifest produced by this GHCR build.
-          resolved_digest="$(docker buildx imagetools inspect "$pull_through_image" --format '{{.Manifest.Digest}}')"
-          test "$resolved_digest" = "${{ steps.build.outputs.digest }}"
+          resolved_digest=""
+          for attempt in $(seq 1 24); do
+            if resolved_digest="$(docker buildx imagetools inspect "$pull_through_image" --format '{{.Manifest.Digest}}' 2>/dev/null)"; then
+              test "$resolved_digest" = "${{ steps.build.outputs.digest }}"
+              break
+            fi
+            if test "$attempt" -eq 24; then
+              echo "GHCR pull-through did not expose the immutable image in time" >&2
+              exit 1
+            fi
+            sleep 5
+          done
 
           node scripts/render-ci-deployment.mjs \
             "$pull_through_image"
