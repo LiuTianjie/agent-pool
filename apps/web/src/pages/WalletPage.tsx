@@ -1,0 +1,365 @@
+import type { WalletSummary } from '@agent-pool/shared';
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  ArrowUpFromLine,
+  CircleDollarSign,
+  Info,
+  LockKeyhole,
+  Plus,
+  ReceiptText,
+  ShieldCheck,
+  WalletCards,
+} from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { EmptyState, InlineError, LoadingState } from '../components/LoadingState';
+import { PageHeader } from '../components/PageHeader';
+import { WalletGrid } from '../components/WalletGrid';
+import { api, ApiError, normalizeList } from '../lib/api';
+import { credits, fullDateTime } from '../lib/format';
+import type { LedgerEntry } from '../lib/types';
+
+const TOP_UP_OPTIONS = [1_000, 5_000, 20_000, 100_000];
+
+const ENTRY_LABEL: Record<LedgerEntry['kind'], string> = {
+  topup: '开发 PULSE 增加',
+  lock: '发布任务锁定',
+  unlock: '未执行 PULSE 解锁',
+  earning_pending: '交付待结算',
+  earning_settled: '收益已结算',
+  withdrawal: '开发态模拟提现',
+  adjustment: '账本调整',
+};
+
+const BUCKET_LABEL: Record<keyof WalletSummary, string> = {
+  purchasedAvailable: '可消费',
+  purchasedLocked: '任务锁定',
+  earnedPending: '待结算收益',
+  earnedAvailable: '可提现收益',
+};
+
+export function WalletPage() {
+  const [wallet, setWallet] = useState<WalletSummary | null>(null);
+  const [entries, setEntries] = useState<LedgerEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [topUpOpen, setTopUpOpen] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState(5_000);
+  const [toppingUp, setToppingUp] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState(1);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawalNotice, setWithdrawalNotice] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [walletResult, ledgerResult] = await Promise.all([api.wallet(), api.ledger()]);
+      setWallet(walletResult);
+      setEntries(normalizeList(ledgerResult));
+      setError(null);
+    } catch (requestError) {
+      setError(requestError instanceof ApiError ? requestError.message : '无法读取 PULSE 账本');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const topUp = async () => {
+    if (topUpAmount < 1 || topUpAmount > 1_000_000) {
+      setError('演示 PULSE 增加范围为 1–1,000,000 PULSE（非真实法币）');
+      return;
+    }
+    setToppingUp(true);
+    setError(null);
+    try {
+      setWallet(await api.devTopUp(Math.trunc(topUpAmount)));
+      setTopUpOpen(false);
+      const ledgerResult = await api.ledger();
+      setEntries(normalizeList(ledgerResult));
+    } catch (requestError) {
+      setError(requestError instanceof ApiError ? requestError.message : '增加 PULSE 失败');
+    } finally {
+      setToppingUp(false);
+    }
+  };
+
+  const withdraw = async () => {
+    if (!wallet) return;
+    if (withdrawAmount < 1 || withdrawAmount > wallet.earnedAvailable) {
+      setError('只能从可提现收益中选择有效数量');
+      return;
+    }
+    setWithdrawing(true);
+    setError(null);
+    try {
+      const result = await api.devWithdraw(Math.trunc(withdrawAmount));
+      setWallet(result.wallet);
+      setWithdrawalNotice(`模拟提现已标记为 ${result.status}，未产生真实法币。`);
+      setWithdrawOpen(false);
+      setEntries(normalizeList(await api.ledger()));
+    } catch (requestError) {
+      setError(requestError instanceof ApiError ? requestError.message : '模拟提现失败');
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
+  if (loading && !wallet) return <LoadingState label="正在核对 PULSE 账本" />;
+  if (error && !wallet) return <InlineError message={error} retry={() => void load()} />;
+  if (!wallet) return null;
+
+  return (
+    <div className="page wallet-page">
+      <PageHeader
+        eyebrow="LEDGER / PREPAID CREDITS"
+        title="PULSE 账本"
+        description="PULSE 是演示积分 / 非真实法币。增加的 PULSE 只能发布任务，Agent 赚得的 PULSE 单独进入收益。"
+        actions={
+          <>
+            <button
+              className="button button-outline"
+              type="button"
+              disabled={wallet.earnedAvailable < 1}
+              onClick={() => {
+                setWithdrawAmount(Math.max(1, wallet.earnedAvailable));
+                setWithdrawOpen(true);
+              }}
+            >
+              <ArrowUpFromLine aria-hidden="true" /> 模拟提现
+            </button>
+            <button
+              className="button button-primary"
+              type="button"
+              onClick={() => setTopUpOpen(true)}
+            >
+              <Plus aria-hidden="true" /> 增加演示 PULSE
+            </button>
+          </>
+        }
+      />
+      {error ? <InlineError message={error} /> : null}
+      {withdrawalNotice ? (
+        <div className="success-notice" role="status">
+          {withdrawalNotice}
+        </div>
+      ) : null}
+      <WalletGrid wallet={wallet} />
+
+      <section className="money-boundary">
+        <article>
+          <span className="money-icon">
+            <ArrowDownLeft aria-hidden="true" />
+          </span>
+          <div>
+            <span className="section-index">PURCHASED</span>
+            <h2>增加的 PULSE</h2>
+            <p>只能用于锁定任务预算；不能转给其他账户，也不能提现。</p>
+          </div>
+        </article>
+        <span className="boundary-divider">
+          <LockKeyhole aria-hidden="true" />
+        </span>
+        <article>
+          <span className="money-icon money-icon-warm">
+            <ArrowUpRight aria-hidden="true" />
+          </span>
+          <div>
+            <span className="section-index">EARNED</span>
+            <h2>赚来的 PULSE</h2>
+            <p>交付通过后先进入待结算，之后进入可模拟提现收益；全程不产生真实法币。</p>
+          </div>
+        </article>
+      </section>
+
+      <section className="ledger-section page-section">
+        <div className="section-bar">
+          <div>
+            <span className="section-index">IMMUTABLE FLOW</span>
+            <h2>最近账目</h2>
+          </div>
+          <span>{entries.length} 笔</span>
+        </div>
+        {entries.length ? (
+          <div className="ledger-table" role="table" aria-label="PULSE 流水，演示积分，非真实法币">
+            <div className="ledger-head" role="row">
+              <span>类型</span>
+              <span>说明</span>
+              <span>账户</span>
+              <span>时间</span>
+              <span>金额</span>
+            </div>
+            {entries.map((entry) => (
+              <div className="ledger-row" role="row" key={entry.id}>
+                <span className={`ledger-kind ledger-${entry.kind}`}>
+                  <ReceiptText aria-hidden="true" /> {ENTRY_LABEL[entry.kind]}
+                </span>
+                <div>
+                  <strong>{entry.description}</strong>
+                  {entry.referenceId ? <small>REF / {entry.referenceId.slice(0, 12)}</small> : null}
+                </div>
+                <span>{BUCKET_LABEL[entry.balanceBucket]}</span>
+                <time dateTime={entry.createdAt}>{fullDateTime(entry.createdAt)}</time>
+                <strong className={entry.amount >= 0 ? 'amount-positive' : 'amount-negative'}>
+                  {entry.amount >= 0 ? '+' : ''}
+                  {credits(entry.amount)}
+                </strong>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="账本还是空的"
+            detail="增加演示 PULSE 或完成第一个 Unit 后，所有 PULSE 流动都会记录在这里。"
+          />
+        )}
+      </section>
+
+      <aside className="dev-money-note">
+        <Info aria-hidden="true" />
+        <p>
+          <strong>开发阶段说明</strong> PULSE 是演示积分 /
+          非真实法币。当前增加不会发起真实扣款，模拟提现只写入 simulated_paid 账本记录；Purchased 与
+          Earned 始终保持独立。
+        </p>
+      </aside>
+
+      {topUpOpen ? (
+        <div
+          className="dialog-backdrop"
+          role="presentation"
+          onMouseDown={(event) => event.target === event.currentTarget && setTopUpOpen(false)}
+        >
+          <section
+            className="dialog topup-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="topup-title"
+          >
+            <div className="dialog-icon dialog-icon-lime">
+              <WalletCards aria-hidden="true" />
+            </div>
+            <span className="page-eyebrow">DEV CREDIT FAUCET</span>
+            <h2 id="topup-title">增加演示 PULSE</h2>
+            <p>PULSE 是演示积分 / 非真实法币。这不会产生真实支付，余额只能用于发布任务。</p>
+            <div className="topup-options">
+              {TOP_UP_OPTIONS.map((amount) => (
+                <button
+                  type="button"
+                  className={topUpAmount === amount ? 'active' : ''}
+                  onClick={() => setTopUpAmount(amount)}
+                  key={amount}
+                >
+                  {credits(amount)}
+                </button>
+              ))}
+            </div>
+            <label className="field">
+              <span>自定义数量</span>
+              <span className="input-shell">
+                <CircleDollarSign aria-hidden="true" />
+                <input
+                  type="number"
+                  min={1}
+                  max={1_000_000}
+                  value={topUpAmount}
+                  onChange={(event) => setTopUpAmount(Number(event.target.value))}
+                />
+              </span>
+            </label>
+            <div className="topup-assurance">
+              <ShieldCheck aria-hidden="true" />
+              <span>服务端账本会记录本次增加；增加获得的 PULSE 不能提现。</span>
+            </div>
+            <div className="dialog-actions">
+              <button
+                className="button button-quiet"
+                type="button"
+                onClick={() => setTopUpOpen(false)}
+              >
+                取消
+              </button>
+              <button
+                className="button button-primary"
+                type="button"
+                disabled={toppingUp}
+                onClick={() => void topUp()}
+              >
+                {toppingUp ? '正在入账…' : `增加 ${credits(topUpAmount)}`}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {withdrawOpen ? (
+        <div
+          className="dialog-backdrop"
+          role="presentation"
+          onMouseDown={(event) => event.target === event.currentTarget && setWithdrawOpen(false)}
+        >
+          <section
+            className="dialog topup-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="withdraw-title"
+          >
+            <div className="dialog-icon dialog-icon-lime">
+              <ArrowUpFromLine aria-hidden="true" />
+            </div>
+            <span className="page-eyebrow">DEV WITHDRAWAL</span>
+            <h2 id="withdraw-title">模拟提现收益</h2>
+            <p>
+              只会扣减 Earned Available 并写入一笔 <code>simulated_paid</code>{' '}
+              记录，不产生真实银行卡、钱包或法币付款。
+            </p>
+            <label className="field">
+              <span>从可提现收益扣减</span>
+              <span className="input-shell">
+                <CircleDollarSign aria-hidden="true" />
+                <input
+                  type="number"
+                  min={1}
+                  max={wallet.earnedAvailable}
+                  value={withdrawAmount}
+                  onChange={(event) => setWithdrawAmount(Number(event.target.value))}
+                />
+              </span>
+              <small>
+                当前最多 {credits(wallet.earnedAvailable)}；增加获得的 PULSE 永远不可提现。演示积分
+                / 非真实法币。
+              </small>
+            </label>
+            <div className="topup-assurance">
+              <ShieldCheck aria-hidden="true" />
+              <span>开发态闭环：服务端返回 simulated_paid，仅用于验证赚取 → 提现的账本流程。</span>
+            </div>
+            <div className="dialog-actions">
+              <button
+                className="button button-quiet"
+                type="button"
+                onClick={() => setWithdrawOpen(false)}
+              >
+                取消
+              </button>
+              <button
+                className="button button-primary"
+                type="button"
+                disabled={
+                  withdrawing || withdrawAmount < 1 || withdrawAmount > wallet.earnedAvailable
+                }
+                onClick={() => void withdraw()}
+              >
+                {withdrawing ? '正在处理…' : `模拟提现 ${credits(withdrawAmount)}`}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </div>
+  );
+}

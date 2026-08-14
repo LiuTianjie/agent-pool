@@ -1,0 +1,28 @@
+{
+  "name": "agent-pool",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.18.0",
+  "scripts": {
+    "build": "pnpm --filter @agent-pool/shared build && pnpm --filter @agent-pool/runner build && pnpm --filter @agent-pool/official-runner build && pnpm --filter @agent-pool/web build && pnpm stage:runner && pnpm --filter @agent-pool/api build",
+    "dev": "pnpm --parallel --filter @agent-pool/api --filter @agent-pool/web dev",
+    "dev:api": "pnpm --filter @agent-pool/api dev",
+    "dev:web": "pnpm --filter @agent-pool/web dev",
+    "dev:runner": "pnpm --filter @agent-pool/runner dev",
+    "stage:runner": "node scripts/stage-runner.mjs",
+    "smoke:live": "node scripts/live-smoke.mjs",
+    "smoke:control-local": "node scripts/control-smoke.mjs",
+    "smoke:official-local": "node scripts/official-fleet-smoke.mjs",
+    "test": "pnpm --filter @agent-pool/shared build && pnpm -r test",
+    "typecheck": "pnpm --filter @agent-pool/shared build && pnpm -r typecheck",
+    "lint": "pnpm --filter @agent-pool/shared build && pnpm -r lint",
+    "format:check": "prettier --check .",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "prettier": "^3.6.2",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

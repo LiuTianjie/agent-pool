@@ -1,0 +1,46 @@
+services:
+  app:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      WEB_DIST_PATH: /app/apps/web/dist
+      APP_ORIGIN: ${APP_ORIGIN}
+      DATABASE_URL: postgresql://agentpool:${POSTGRES_PASSWORD}@postgres:5432/agentpool
+      JWT_SECRET: ${JWT_SECRET}
+      TASK_ENCRYPTION_KEY: ${TASK_ENCRYPTION_KEY}
+      ALLOW_DEV_TOPUP: ${ALLOW_DEV_TOPUP}
+      DEFAULT_OFFICIAL_OWNER_EMAIL: ${DEFAULT_OFFICIAL_OWNER_EMAIL:-liu28719976@gmail.com}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - '3000:3000'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/healthz']
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: agentpool
+      POSTGRES_USER: agentpool
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U agentpool -d agentpool']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

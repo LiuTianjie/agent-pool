@@ -1,0 +1,27 @@
+{
+  "name": "@agent-pool/official-runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "agentpool-official": "./dist/agentpool-official",
+    "agentpool-official-fleet": "./dist/agentpool-official"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit && node scripts/build.mjs",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.5",
+    "tsx": "^4.20.3"
+  }
+}

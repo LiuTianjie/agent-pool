@@ -1,0 +1,53 @@
+{
+  "version": "agentpool-official-fleet/1",
+  "pollIntervalMs": 3000,
+  "cells": [
+    {
+      "id": "codex-primary",
+      "adapter": "codex",
+      "model": "exact-model-id",
+      "allowWebhooks": false,
+      "routes": [
+        {
+          "id": "relay-a",
+          "kind": "cli",
+          "concurrency": 8,
+          "environment": {
+            "OPENAI_BASE_URL": "https://relay.example.com/v1"
+          },
+          "secretEnvRefs": {
+            "OPENAI_API_KEY": {
+              "env": "OFFICIAL_RELAY_A_KEY"
+            }
+          }
+        },
+        {
+          "id": "relay-b",
+          "kind": "cli",
+          "concurrency": 8,
+          "environment": {
+            "OPENAI_BASE_URL": "https://relay-backup.example.com/v1"
+          },
+          "secretEnvRefs": {
+            "OPENAI_API_KEY": {
+              "file": "/run/secrets/official-relay-b-key"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "zero-cost-smoke",
+      "adapter": "mock",
+      "model": "mock-v1",
+      "allowWebhooks": false,
+      "routes": [
+        {
+          "id": "mock-local",
+          "kind": "mock",
+          "concurrency": 2
+        }
+      ]
+    }
+  ]
+}

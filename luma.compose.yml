@@ -1,0 +1,23 @@
+name: agent-pool
+compose: docker-compose.deploy.yml
+region: cn
+
+volumes:
+  postgres-local-data:
+    local:
+      node: manager
+      path: /srv/agent-pool/postgres
+    accessMode: ReadWriteOnce
+    initialize: empty
+
+services:
+  app:
+    node: manager
+    exposure: cn-edge
+    domain: agentpool.itool.tech
+    port: 3000
+    replicas: 1
+
+  postgres:
+    node: manager
+    exposure: none
