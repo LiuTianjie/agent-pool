@@ -26,7 +26,6 @@ import { LiveStatus, PoolStatus } from '../components/Status';
 import { useLiveEvents } from '../hooks/useLiveEvents';
 import { api, ApiError } from '../lib/api';
 import {
-  capacityReason,
   credits,
   duration,
   fullDateTime,
@@ -255,28 +254,18 @@ export function PoolDetailPage() {
             <strong>{pool.acceptedUnits.toLocaleString('zh-CN')}</strong>
             <span>/ {pool.totalUnits.toLocaleString('zh-CN')}</span>
           </div>
+          <small>已通过</small>
         </div>
         <div className="concurrency-display">
           <div>
             <strong>{activeConcurrency}</strong>
             <span>/ {pool.requiredConcurrency}</span>
           </div>
-          <small>
-            {pool.requestedAgent} · {pool.requestedModel}
-          </small>
+          <small>同时执行上限</small>
         </div>
         <div className={deadlineRisk ? 'deadline-display deadline-risk' : 'deadline-display'}>
           <Clock3 aria-hidden="true" />
           <strong>{fullDateTime(pool.deadlineAt)}</strong>
-          <small>
-            {deadlineRisk
-              ? (pool.deadlineRiskReason
-                  ? capacityReason(pool.deadlineRiskReason.split(' · ')[0] || '')
-                  : undefined) || (deadlinePassed ? '截止时间已过' : '当前容量参考提示存在延期风险')
-              : pool.estimatedCompletionAt
-                ? `容量参考：${relativeTime(pool.estimatedCompletionAt)}完成；需 Runner 主动领取`
-                : '暂无足够数据计算 ETA'}
-          </small>
         </div>
       </section>
 
@@ -422,12 +411,16 @@ export function PoolDetailPage() {
             {capsule ? (
               <>
                 <div className="capsule-detail-summary">
-                  <strong>{capsule.goal}</strong>
+                  {capsule.goal && capsule.goal !== pool.title ? (
+                    <strong>{capsule.goal}</strong>
+                  ) : null}
                   <dl>
+                    {capsule.inputDescription && capsule.inputDescription !== pool.publicSummary ? (
                     <div>
                       <dt>输入</dt>
                       <dd>{capsule.inputDescription}</dd>
                     </div>
+                    ) : null}
                     <div>
                       <dt>输出</dt>
                       <dd>{capsule.outputDescription}</dd>

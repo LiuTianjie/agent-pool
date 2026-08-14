@@ -100,10 +100,6 @@ export function RunnerClaimMarket({
             <h2>选一台 Runner，抢这一批</h2>
           </span>
         </div>
-        <div className="runner-market-signal" aria-live="polite">
-          <span aria-hidden="true" />
-          <strong>{matchedPools.length.toLocaleString('zh-CN')}</strong>
-        </div>
       </header>
 
       <div className="runner-market-rule">
