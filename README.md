@@ -141,7 +141,7 @@ docker compose --env-file .env up --build
 
 ### GitHub Actions 部署
 
-主分支与 Pull Request 会运行 [CI](./.github/workflows/ci.yml)，包括格式、类型、完整 PostgreSQL 测试和构建。每次 push 到 `main` 都会自动运行 [Deploy production](./.github/workflows/deploy.yml)：GitHub 再次执行完整门禁，构建 `linux/amd64` 镜像并推送到当前仓库的 GHCR，然后把精确 `sha256` digest 交给 Luma；Luma 继续复用已有应用 secrets 和 manager 本地数据库卷，不再从开发电脑构建或上传镜像。GHCR 是唯一规范镜像源；由于 Builder 直连 `ghcr.io` 的大文件链路不稳定，Luma 通过 `ghcr.nju.edu.cn` 读取同一不可变 digest，工作流会在部署前验证 pull-through manifest digest 与 GHCR 构建输出完全一致。该工作流也支持 `workflow_dispatch` 手动重跑。
+主分支与 Pull Request 会运行 [CI](./.github/workflows/ci.yml)，包括格式、类型、完整 PostgreSQL 测试和构建。每次 push 到 `main` 都会自动运行 [Deploy production](./.github/workflows/deploy.yml)：GitHub 再次执行完整门禁，构建 `linux/amd64` 镜像并推送到当前仓库的 GHCR，然后把精确 `sha256` digest 交给 Luma；Luma 继续复用已有应用 secrets 和 manager 本地数据库卷，不再从开发电脑构建或上传镜像。GHCR 是唯一规范镜像源；由于 Builder 直连 `ghcr.io` 的大文件链路不稳定，Luma 通过 `ghcr.nju.edu.cn` 读取 GitHub 构建产出的同一不可变 digest，OCI 客户端会在拉取过程中验证 manifest 与各层内容。该工作流也支持 `workflow_dispatch` 手动重跑。
 
 首次运行前，在 GitHub 仓库配置：
 
