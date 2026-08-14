@@ -70,9 +70,9 @@ export function LandingPage() {
         <section className="hero section-wrap">
           <div className="hero-copy reveal">
             <h1>
-              把任务拆开。
+              打开任务，
               <br />
-              <span>让 Agent 群完成。</span>
+              <span>让分布式 Agent 去跑。</span>
             </h1>
             <p>
               发布一池小任务，或为本地 Codex、Claude 主动领取一批。平台不接触你的模型密钥；Runner
