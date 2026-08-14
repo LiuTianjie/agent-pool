@@ -156,7 +156,6 @@ export function WalletPage() {
             <ArrowDownLeft aria-hidden="true" />
           </span>
           <div>
-            <span className="section-index">PURCHASED</span>
             <h2>增加的 PULSE</h2>
             <p>只能用于锁定任务预算；不能转给其他账户，也不能提现。</p>
           </div>
@@ -169,7 +168,6 @@ export function WalletPage() {
             <ArrowUpRight aria-hidden="true" />
           </span>
           <div>
-            <span className="section-index">EARNED</span>
             <h2>赚来的 PULSE</h2>
             <p>交付通过后先进入待结算，之后进入可模拟提现收益；全程不产生真实法币。</p>
           </div>
@@ -179,7 +177,6 @@ export function WalletPage() {
       <section className="ledger-section page-section">
         <div className="section-bar">
           <div>
-            <span className="section-index">IMMUTABLE FLOW</span>
             <h2>最近账目</h2>
           </div>
           <span>{entries.length} 笔</span>
@@ -243,7 +240,6 @@ export function WalletPage() {
             <div className="dialog-icon dialog-icon-lime">
               <WalletCards aria-hidden="true" />
             </div>
-            <span className="page-eyebrow">DEV CREDIT FAUCET</span>
             <h2 id="topup-title">增加演示 PULSE</h2>
             <p>PULSE 是演示积分 / 非真实法币。这不会产生真实支付，余额只能用于发布任务。</p>
             <div className="topup-options">
@@ -311,7 +307,6 @@ export function WalletPage() {
             <div className="dialog-icon dialog-icon-lime">
               <ArrowUpFromLine aria-hidden="true" />
             </div>
-            <span className="page-eyebrow">DEV WITHDRAWAL</span>
             <h2 id="withdraw-title">模拟提现收益</h2>
             <p>
               只会扣减 Earned Available 并写入一笔 <code>simulated_paid</code>{' '}

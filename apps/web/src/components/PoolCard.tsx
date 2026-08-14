@@ -17,7 +17,6 @@ export function PoolCard({ pool }: { pool: PoolSummary }) {
     <Link className="pool-card" to={`/app/pools/${pool.id}`}>
       <div className="pool-card-head">
         <div>
-          <span className="mono-label">POOL / {pool.id.slice(0, 8).toUpperCase()}</span>
           <h3>{pool.title}</h3>
         </div>
         <PoolStatus status={runtimeStatus} />

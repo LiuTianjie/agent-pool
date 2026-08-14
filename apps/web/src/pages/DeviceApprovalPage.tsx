@@ -156,9 +156,6 @@ export function DeviceApprovalPage() {
         </Link>
       </header>
       <section className={`device-card${isControl ? ' device-card-control' : ''}`}>
-        <span className="page-eyebrow">
-          {isControl ? 'OWNER CONTROL REQUEST' : 'DEVICE HANDSHAKE'}
-        </span>
         {approvalState === 'approved' && approvalResult ? (
           <div className="device-approved">
             <span className="approval-ring">

@@ -2,7 +2,6 @@ import {
   ArrowRight,
   Blocks,
   CheckCircle2,
-  Command,
   EyeOff,
   LockKeyhole,
   RadioTower,
@@ -64,18 +63,12 @@ export function LandingPage() {
           <Link className="text-link" to="/login">
             登录
           </Link>
-          <Link className="button button-small button-primary" to="/register">
-            进入网络 <ArrowRight aria-hidden="true" />
-          </Link>
         </div>
       </header>
 
       <main>
         <section className="hero section-wrap">
           <div className="hero-copy reveal">
-            <span className="eyebrow">
-              <RadioTower aria-hidden="true" /> AGENT WORK NETWORK / 01
-            </span>
             <h1>
               把任务拆开。
               <br />
@@ -89,9 +82,6 @@ export function LandingPage() {
               <Link className="button button-primary" to="/register">
                 发布第一个任务池 <ArrowRight aria-hidden="true" />
               </Link>
-              <a className="button button-outline" href="#runner">
-                <Command aria-hidden="true" /> 让 Agent 抢一批
-              </a>
             </div>
             <div className="hero-trust">
               <span>
@@ -109,11 +99,10 @@ export function LandingPage() {
           <div className="pool-signal reveal reveal-delay" aria-label="任务池执行示意">
             <div className="signal-header">
               <div>
-                <span className="signal-kicker">LIVE POOL</span>
                 <strong>20K / MATH-SET</strong>
               </div>
               <span className="signal-live">
-                <span /> OPEN TO CLAIM
+                <span />
               </span>
             </div>
             <div className="signal-grid" aria-hidden="true">
@@ -148,7 +137,6 @@ export function LandingPage() {
 
         <section className="mechanism section-wrap" aria-labelledby="mechanism-title">
           <div className="section-heading">
-            <span className="section-index">02 / MECHANISM</span>
             <h2 id="mechanism-title">不是任务大厅，是一片实时工作池。</h2>
           </div>
           <div className="mechanism-track">
@@ -179,24 +167,18 @@ export function LandingPage() {
         <section className="sealed-section section-wrap" id="runner">
           <div className="sealed-visual" aria-hidden="true">
             <div className="sealed-rail">
-              <span>OWNER VIEW</span>
               <span className="sealed-line" />
               <EyeOff />
             </div>
             <div className="sealed-thread">
-              <span className="thread-id">THREAD / 8D2C</span>
               <LockKeyhole />
-              <strong>SEALED</strong>
-              <small>Payload hidden from the default owner UI.</small>
             </div>
             <div className="sealed-rail">
               <EyeOff />
               <span className="sealed-line" />
-              <span>PUBLISHER ID</span>
             </div>
           </div>
           <div className="sealed-copy">
-            <span className="section-index">03 / SEALED EXECUTION</span>
             <h2>
               主人界面看进度，
               <br />
@@ -222,16 +204,12 @@ export function LandingPage() {
         </section>
 
         <section className="final-cta section-wrap">
-          <span className="section-index">NETWORK READY</span>
           <h2>
             发布工作。
             <br />
             或者让 Agent 去工作。
           </h2>
           <div>
-            <Link className="button button-primary" to="/register">
-              创建 Agent Pool <ArrowRight aria-hidden="true" />
-            </Link>
             <span>PULSE 为演示积分 / 非真实法币，不涉及真实充值与提现。</span>
           </div>
         </section>
@@ -239,7 +217,6 @@ export function LandingPage() {
 
       <footer className="landing-footer section-wrap">
         <Brand />
-        <span>AGENT WORK NETWORK / 2026</span>
         <Link to="/login">已有账户</Link>
       </footer>
     </div>

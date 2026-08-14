@@ -6,7 +6,6 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
-  CircleDashed,
   Clock3,
   Cpu,
   Fingerprint,
@@ -27,7 +26,6 @@ import { LiveStatus, PoolStatus } from '../components/Status';
 import { useLiveEvents } from '../hooks/useLiveEvents';
 import { api, ApiError } from '../lib/api';
 import {
-  capacityReason,
   credits,
   duration,
   fullDateTime,
@@ -48,10 +46,6 @@ const UNIT_STATUS: Record<UnitStatus, string> = {
   failed: '失败',
   cancelled: '已取消',
 };
-
-function completion(pool: PoolDetail): number {
-  return pool.totalUnits ? Math.round((pool.acceptedUnits / pool.totalUnits) * 1000) / 10 : 0;
-}
 
 function resultJson(value: unknown): string {
   if (value === undefined) return '尚无交付内容';
@@ -190,7 +184,6 @@ export function PoolDetailPage() {
   if (error && !pool) return <InlineError message={error} retry={() => void load()} />;
   if (!pool) return null;
 
-  const progress = completion(pool);
   const canCancel = ['piloting', 'waiting_capacity', 'queued', 'running', 'paused'].includes(
     pool.status,
   );
@@ -226,7 +219,6 @@ export function PoolDetailPage() {
       </Link>
       <header className="pool-detail-header">
         <div>
-          <span className="page-eyebrow">POOL / {pool.id.toUpperCase()}</span>
           <div className="title-line">
             <h1>{pool.title}</h1>
             <PoolStatus status={pool.status} />
@@ -258,52 +250,32 @@ export function PoolDetailPage() {
 
       <section className="pool-hero-meter">
         <div className="meter-main">
-          <span className="mono-label">ACCEPTED / TOTAL</span>
           <div className="meter-number">
             <strong>{pool.acceptedUnits.toLocaleString('zh-CN')}</strong>
             <span>/ {pool.totalUnits.toLocaleString('zh-CN')}</span>
           </div>
-          <div className="hero-progress" aria-label={`完成 ${progress}%`}>
-            <span style={{ width: `${progress}%` }} />
-          </div>
-          <small>{progress}% 已验收通过</small>
+          <small>已通过</small>
         </div>
         <div className="concurrency-display">
-          <span className="mono-label">ACTIVE / SIMULTANEOUS LIMIT</span>
           <div>
             <strong>{activeConcurrency}</strong>
             <span>/ {pool.requiredConcurrency}</span>
           </div>
-          <small>
-            {pool.requestedAgent} · {pool.requestedModel}
-          </small>
+          <small>同时执行上限</small>
         </div>
         <div className={deadlineRisk ? 'deadline-display deadline-risk' : 'deadline-display'}>
-          <span className="mono-label">DEADLINE / ETA</span>
           <Clock3 aria-hidden="true" />
           <strong>{fullDateTime(pool.deadlineAt)}</strong>
-          <small>
-            {deadlineRisk
-              ? (pool.deadlineRiskReason
-                  ? pool.deadlineRiskReason.split(' · ').map(capacityReason).join(' · ')
-                  : undefined) || (deadlinePassed ? '截止时间已过' : '当前容量参考提示存在延期风险')
-              : pool.estimatedCompletionAt
-                ? `容量参考：${relativeTime(pool.estimatedCompletionAt)}完成；需 Runner 主动领取`
-                : '暂无足够数据计算 ETA'}
-          </small>
         </div>
       </section>
 
-      {pool.launchMode === 'pilot' && (pool.status === 'piloting' || heldUnitCount > 0) ? (
-        <section className={canLaunchHeld ? 'pilot-gate pilot-gate-ready' : 'pilot-gate'}>
+      {canLaunchHeld ? (
+        <section className="pilot-gate pilot-gate-ready">
           <div className="pilot-gate-signal" aria-hidden="true">
             <Flame />
           </div>
           <div className="pilot-gate-copy">
-            <span className="section-index">PILOT GATE / EXPLICIT RELEASE</span>
-            <h2>
-              {canLaunchHeld ? 'Pilot 已全部通过，可以放量。' : '先观察点火结果，再释放全池。'}
-            </h2>
+            <h2>Pilot 已全部通过，可以放量。</h2>
             <p>
               {pilotAcceptedUnits}/{pilotUnitCount} accepted · {pilotFailedUnits} failed ·{' '}
               {heldUnitCount.toLocaleString('zh-CN')} held。平台不会自动越过这道门。
@@ -348,38 +320,9 @@ export function PoolDetailPage() {
       {tab === 'overview' ? (
         <div className="overview-layout">
           <section>
-            <div className="status-count-grid">
-              <article>
-                <CircleDashed aria-hidden="true" />
-                <span>开放领取</span>
-                <strong>{pool.queuedUnits.toLocaleString('zh-CN')}</strong>
-              </article>
-              <article className="status-running">
-                <RotateCcw aria-hidden="true" />
-                <span>执行中</span>
-                <strong>{pool.runningUnits.toLocaleString('zh-CN')}</strong>
-              </article>
-              <article className="status-submitted">
-                <Boxes aria-hidden="true" />
-                <span>待验收</span>
-                <strong>{pool.submittedUnits.toLocaleString('zh-CN')}</strong>
-              </article>
-              <article className="status-accepted">
-                <CheckCircle2 aria-hidden="true" />
-                <span>已通过</span>
-                <strong>{pool.acceptedUnits.toLocaleString('zh-CN')}</strong>
-              </article>
-              <article className="status-failed">
-                <X aria-hidden="true" />
-                <span>失败</span>
-                <strong>{pool.failedUnits.toLocaleString('zh-CN')}</strong>
-              </article>
-            </div>
-
             <div className="detail-block">
               <div className="section-bar">
                 <div>
-                  <span className="section-index">EXECUTION CONTRACT</span>
                   <h2>执行硬约束</h2>
                 </div>
               </div>
@@ -458,7 +401,6 @@ export function PoolDetailPage() {
             <div className="owner-secret-head">
               <LockKeyhole aria-hidden="true" />
               <div>
-                <span className="mono-label">PUBLISHER ONLY</span>
                 <strong>Task Capsule / {capsule?.version || 'legacy'}</strong>
               </div>
             </div>
@@ -469,13 +411,16 @@ export function PoolDetailPage() {
             {capsule ? (
               <>
                 <div className="capsule-detail-summary">
-                  <span>GOAL</span>
-                  <strong>{capsule.goal}</strong>
+                  {capsule.goal && capsule.goal !== pool.title ? (
+                    <strong>{capsule.goal}</strong>
+                  ) : null}
                   <dl>
+                    {capsule.inputDescription && capsule.inputDescription !== pool.publicSummary ? (
                     <div>
                       <dt>输入</dt>
                       <dd>{capsule.inputDescription}</dd>
                     </div>
+                    ) : null}
                     <div>
                       <dt>输出</dt>
                       <dd>{capsule.outputDescription}</dd>
@@ -523,7 +468,6 @@ export function PoolDetailPage() {
         <section className="results-section">
           <div className="result-toolbar">
             <div>
-              <span className="section-index">DELIVERIES</span>
               <h2>Unit 结果与验收</h2>
             </div>
             <label>

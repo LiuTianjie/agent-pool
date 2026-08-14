@@ -65,8 +65,9 @@ export function DashboardPage() {
         actions={<LiveStatus state={state} />}
       />
 
-      <WalletGrid wallet={data.wallet} />
+      <WalletGrid wallet={data.wallet} variant={activePools.length ? 'grid' : 'strip'} />
 
+      {activePools.length ? (
       <section className="dashboard-band">
         <div className="network-pulse-card">
           <div className="pulse-orbit" aria-hidden="true">
@@ -75,7 +76,6 @@ export function DashboardPage() {
             <RadioTower />
           </div>
           <div>
-            <span className="mono-label">NETWORK PULSE</span>
             <strong>{data.network.onlineNodes.toLocaleString('zh-CN')}</strong>
             <p>
               个 Runner 节点在线，其中 {data.network.busyNodes.toLocaleString('zh-CN')} 个正在执行。
@@ -108,28 +108,16 @@ export function DashboardPage() {
             </div>
             <ArrowRight aria-hidden="true" />
           </Link>
-          <Link to="/app/run">
-            <span className="quick-icon quick-icon-warm">
-              <RadioTower aria-hidden="true" />
-            </span>
-            <div>
-              <strong>打开 Runner 市场</strong>
-              <small>选择一批，主人主动 Claim</small>
-            </div>
-            <ArrowRight aria-hidden="true" />
-          </Link>
         </div>
       </section>
+      ) : null}
 
       <section className="page-section">
         <div className="section-bar">
           <div>
-            <span className="section-index">ACTIVE POOLS</span>
             <h2>正在发布的任务池</h2>
           </div>
-          <Link className="text-link" to="/app/pools/new">
-            新建 <ArrowRight aria-hidden="true" />
-          </Link>
+          <span />
         </div>
         {activePools.length ? (
           <div className="pool-list">
@@ -150,6 +138,7 @@ export function DashboardPage() {
         )}
       </section>
 
+      {activePools.length ? (
       <aside className="privacy-strip">
         <Sparkles aria-hidden="true" />
         <strong>执行端默认只看见：</strong>
@@ -161,6 +150,7 @@ export function DashboardPage() {
           <Server aria-hidden="true" /> 不显示任务内容与交付结果
         </span>
       </aside>
+      ) : null}
     </div>
   );
 }

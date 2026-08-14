@@ -4623,11 +4623,11 @@ code {
 }
 
 .contract-grid dd {
-  overflow: hidden;
+  overflow-wrap: anywhere;
   margin: 11px 0 0;
   font-family: var(--mono);
   font-size: 0.76rem;
-  text-overflow: ellipsis;
+  word-break: break-word;
 }
 
 .contract-grid .contract-pulse {
@@ -9919,4 +9919,49 @@ code {
   .publish-workbench .capsule-foot {
     padding-inline: 0;
   }
+}
+
+
+.wallet-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.wallet-strip strong {
+  color: var(--text);
+  font-family: var(--mono);
+  font-weight: 520;
+}
+
+.wizard-inline-warning {
+  margin: 0 12px 0 0;
+}
+
+.runner-setup-details {
+  margin: 0 0 28px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.runner-setup-details > summary {
+  cursor: pointer;
+  padding: 14px 18px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.runner-setup-details[open] > summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.runner-setup-details .runner-intro,
+.runner-setup-details .runner-steps,
+.runner-setup-details .sealed-boundary {
+  margin: 0;
 }

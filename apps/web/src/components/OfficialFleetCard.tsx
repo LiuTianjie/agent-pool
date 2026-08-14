@@ -44,14 +44,12 @@ export function OfficialFleetCard({
             <i />
           </span>
           <div>
-            <span className="section-index">OPERATOR CONTROL / OWNER ONLY</span>
             <h2>OFFICIAL FLEET</h2>
           </div>
         </div>
         <div className="official-fleet-current" aria-live="polite">
           <span aria-hidden="true" />
           <div>
-            <small>POWER STATE</small>
             <strong>{fleet.mode.toUpperCase()}</strong>
           </div>
         </div>
@@ -193,11 +191,9 @@ export function OfficialFleetCard({
         </div>
 
         <aside className="official-model-path">
-          <span className="section-index">MODEL PATH / DISCLOSURE</span>
           <div className="model-path-step">
             <KeyRound aria-hidden="true" />
             <span>
-              <small>USER KEY</small>
               <strong>不收集</strong>
             </span>
           </div>
@@ -205,7 +201,6 @@ export function OfficialFleetCard({
           <div className="model-path-step warm">
             <RadioTower aria-hidden="true" />
             <span>
-              <small>MODEL ACCESS</small>
               <strong>合作模型网关</strong>
             </span>
           </div>
@@ -213,7 +208,6 @@ export function OfficialFleetCard({
           <div className="model-path-step">
             <Bot aria-hidden="true" />
             <span>
-              <small>EXECUTION</small>
               <strong>Official Runner</strong>
             </span>
           </div>
