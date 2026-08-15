@@ -18,10 +18,11 @@ export interface StoredDeliveryConfig {
 
 export function normalizeTaskCapsule(input: CreatePoolInput): TaskCapsule {
   if (input.taskCapsule) return input.taskCapsule;
-  const hasExpected = input.units.some((unit) => unit.expectedOutput !== undefined);
+  const units = input.units ?? [];
+  const hasExpected = units.some((unit) => unit.expectedOutput !== undefined);
   const requiresJsonDelivery =
     !!input.outputSchema ||
-    input.units.some(
+    units.some(
       (unit) => unit.expectedOutput !== undefined && typeof unit.expectedOutput !== 'string',
     );
   const acceptanceMode =
@@ -103,20 +104,24 @@ export function contractHashFromPoolRow(row: Record<string, unknown>): string {
     : legacyContractHash(String(row.id ?? row.pool_id));
 }
 
-export function validateTaskContractInput(input: CreatePoolInput, capsule: TaskCapsule): void {
+export function validateTaskContractInput(
+  input: CreatePoolInput,
+  capsule: TaskCapsule,
+  units = input.units ?? [],
+): void {
   if (
     input.taskCapsule &&
     ['hidden_exact', 'schema_and_hidden_exact'].includes(capsule.acceptance.mode)
   ) {
     invariant(
-      input.units.every((unit) => unit.expectedOutput !== undefined),
+      units.length > 0 && units.every((unit) => unit.expectedOutput !== undefined),
       400,
       'EXPECTED_OUTPUT_REQUIRED',
       'Every unit requires expectedOutput for hidden exact acceptance',
     );
     if (capsule.delivery.format === 'text') {
       invariant(
-        input.units.every((unit) => typeof unit.expectedOutput === 'string'),
+        units.every((unit) => typeof unit.expectedOutput === 'string'),
         400,
         'TEXT_EXPECTED_OUTPUT_INVALID',
         'Text delivery requires string expectedOutput values',
@@ -125,9 +130,9 @@ export function validateTaskContractInput(input: CreatePoolInput, capsule: TaskC
   }
   if (input.deliveryTarget.mode === 'webhook') {
     validateWebhookUrl(input.deliveryTarget.url);
-    const labels = input.units.map((unit) => unit.label?.trim()).filter(Boolean) as string[];
+    const labels = units.map((unit) => unit.label?.trim()).filter(Boolean) as string[];
     invariant(
-      labels.length === input.units.length,
+      labels.length === units.length,
       400,
       'WEBHOOK_UNIT_REFERENCE_REQUIRED',
       'Webhook delivery requires a non-empty label on every unit',
@@ -142,20 +147,29 @@ export function validateTaskContractInput(input: CreatePoolInput, capsule: TaskC
 }
 
 export function validateWebhookUrl(raw: string): void {
+  validatePublicHttpsUrl(raw, 'webhook');
+}
+
+export function validateDatasetUrl(raw: string): void {
+  validatePublicHttpsUrl(raw, 'dataset');
+}
+
+export function datasetHostname(raw: string): string {
+  return new URL(raw).hostname.toLowerCase().replace(/\.$/, '');
+}
+
+export function validatePublicHttpsUrl(raw: string, kind: 'webhook' | 'dataset'): void {
+  const code = kind === 'webhook' ? 'INVALID_WEBHOOK_URL' : 'INVALID_DATASET_URL';
+  const label = kind === 'webhook' ? 'Webhook URL' : 'Dataset URL';
   let url: URL;
   try {
     url = new URL(raw);
   } catch {
-    invariant(false, 400, 'INVALID_WEBHOOK_URL', 'Webhook URL is invalid');
+    invariant(false, 400, code, `${label} is invalid`);
   }
-  invariant(url.protocol === 'https:', 400, 'INVALID_WEBHOOK_URL', 'Webhook URL must use HTTPS');
-  invariant(
-    !url.username && !url.password,
-    400,
-    'INVALID_WEBHOOK_URL',
-    'Webhook URL must not contain credentials',
-  );
-  invariant(!url.hash, 400, 'INVALID_WEBHOOK_URL', 'Webhook URL must not contain a fragment');
+  invariant(url.protocol === 'https:', 400, code, `${label} must use HTTPS`);
+  invariant(!url.username && !url.password, 400, code, `${label} must not contain credentials`);
+  invariant(!url.hash, 400, code, `${label} must not contain a fragment`);
   const hostname = url.hostname
     .toLowerCase()
     .replace(/^\[|\]$/g, '')
@@ -166,15 +180,15 @@ export function validateWebhookUrl(raw: string): void {
       !hostname.endsWith('.local') &&
       !hostname.endsWith('.internal'),
     400,
-    'INVALID_WEBHOOK_URL',
-    'Webhook URL must not target localhost',
+    code,
+    `${label} must not target localhost`,
   );
   const ipVersion = isIP(hostname);
   invariant(
     ipVersion === 0 || !isPrivateLiteral(hostname, ipVersion),
     400,
-    'INVALID_WEBHOOK_URL',
-    'Webhook URL must not target a private IP literal',
+    code,
+    `${label} must not target a private IP literal`,
   );
 }
 

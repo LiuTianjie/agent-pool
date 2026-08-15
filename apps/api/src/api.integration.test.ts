@@ -12,6 +12,32 @@ import type { App } from './types.js';
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const integration = databaseUrl ? describe : describe.skip;
 const officialOwnerEmail = `official-owner-${process.pid}-${Date.now()}@example.test`;
+const datasetFixture = Buffer.from(
+  `${JSON.stringify({ question: 'dataset-one' })}\n${JSON.stringify({ question: 'dataset-two' })}\n`,
+  'utf8',
+);
+
+async function testDatasetFetch(url: string, init?: { headers?: Record<string, string> }) {
+  if (!url.startsWith('https://files.example.test/')) {
+    throw new Error(`unexpected dataset fetch ${url}`);
+  }
+  const range = init?.headers?.Range;
+  const match = range ? /^bytes=(\d+)-(\d+)$/.exec(range) : null;
+  if (match) {
+    const start = Number(match[1]);
+    const end = Number(match[2]);
+    return {
+      status: 206,
+      headers: { get: () => 'bytes' },
+      arrayBuffer: async () => datasetFixture.subarray(start, end + 1),
+    };
+  }
+  return {
+    status: 200,
+    headers: { get: () => String(datasetFixture.length) },
+    arrayBuffer: async () => datasetFixture,
+  };
+}
 
 integration('API lifecycle against PostgreSQL', () => {
   let app: App;
@@ -66,6 +92,7 @@ integration('API lifecycle against PostgreSQL', () => {
       },
       db,
       logger: false,
+      datasetFetch: testDatasetFetch,
     });
   });
 
@@ -2715,6 +2742,7 @@ integration('API lifecycle against PostgreSQL', () => {
       },
       db,
       logger: false,
+      datasetFetch: testDatasetFetch,
     });
     const registered = await app.inject({
       method: 'POST',
@@ -3189,5 +3217,61 @@ integration('API lifecycle against PostgreSQL', () => {
       headers: minimalHeaders,
     });
     expect(revokedControl.statusCode).toBe(401);
+  }, 30_000);
+
+  it('indexes an HTTPS dataset without storing unit bodies, then leases one hashed line', async () => {
+    const datasetUrl = 'https://files.example.test/batch.jsonl';
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/pools',
+      headers: { cookie: publisherCookie, origin: 'http://localhost:3000' },
+      payload: {
+        title: 'External JSONL batch',
+        category: 'data',
+        publicSummary: 'Units stay at the publisher HTTPS file and are fetched per lease.',
+        requestedAgent: 'mock',
+        requestedModel: 'mock-v1',
+        requiredConcurrency: 2,
+        maxUnitSeconds: 30,
+        deadlineAt: new Date(Date.now() + 120_000).toISOString(),
+        rewardPerUnit: 4,
+        maxAttempts: 2,
+        taskCapsule: {
+          version: 'ap-task/1',
+          goal: 'Answer each stored question',
+          inputDescription: 'One JSON object per line',
+          outputDescription: 'Any non-empty result',
+          constraints: [],
+          examples: [{ input: { question: 'dataset-one' }, output: 'ok' }],
+          delivery: { format: 'json', maxBytes: 2048 },
+          acceptance: { mode: 'non_empty', criteria: ['non-empty'] },
+        },
+        dataset: { mode: 'https', url: datasetUrl },
+        launchMode: 'immediate',
+      },
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    const pool = created.json().pool as { id: string; totalUnits: number; datasetMode: string };
+    expect(pool.totalUnits).toBe(2);
+    expect(pool.datasetMode).toBe('https');
+    expect(created.body).not.toContain('dataset-one');
+    const stored = await db.query<{ input_ciphertext: string | null; input_sha256: string }>(
+      `SELECT input_ciphertext, input_sha256 FROM task_units WHERE pool_id = $1 ORDER BY ordinal`,
+      [pool.id],
+    );
+    expect(stored.rows).toHaveLength(2);
+    expect(stored.rows.every((row) => row.input_ciphertext === null)).toBe(true);
+    expect(stored.rows[0]?.input_sha256).toMatch(/^[0-9a-f]{64}$/);
+
+    const claim = await claimPool(runnerToken, nodeId, pool.id, 1);
+    const leased = await app.inject({
+      method: 'POST',
+      url: `/api/runner/nodes/${nodeId}/leases/poll`,
+      headers: { authorization: `Bearer ${runnerToken}` },
+      payload: { adapter: 'mock', models: ['mock-v1'], claimId: claim.id },
+    });
+    expect(leased.statusCode, leased.body).toBe(200);
+    expect(leased.json().lease.input).toEqual({ question: 'dataset-one' });
+    expect(leased.body).not.toContain(datasetUrl);
   }, 30_000);
 });

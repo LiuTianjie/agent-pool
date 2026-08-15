@@ -1,5 +1,5 @@
 import type { WalletSummary } from '@agent-pool/shared';
-import { ArrowDownToLine, Clock3, LockKeyhole, Wallet } from 'lucide-react';
+import { ArrowDownToLine, LockKeyhole, Wallet } from 'lucide-react';
 import { credits } from '../lib/format';
 
 const ITEMS: Array<{
@@ -17,7 +17,6 @@ const ITEMS: Array<{
     icon: LockKeyhole,
     tone: 'neutral',
   },
-  { key: 'earnedPending', label: '待结算收益', note: '处于验收窗口', icon: Clock3, tone: 'warm' },
   {
     key: 'earnedAvailable',
     label: '可提现收益',
@@ -26,6 +25,10 @@ const ITEMS: Array<{
     tone: 'white',
   },
 ];
+
+function PendingNote({ wallet }: { wallet: WalletSummary }) {
+  return <p className="wallet-pending-note">待结算收益 {credits(wallet.earnedPending)}</p>;
+}
 
 export function WalletGrid({
   wallet,
@@ -38,29 +41,34 @@ export function WalletGrid({
 }) {
   if (variant === 'strip') {
     return (
-      <div className="wallet-strip" aria-label="积分">
-        {ITEMS.map(({ key, label }) => (
-          <span key={key}>
-            {label} <strong>{credits(wallet[key])}</strong>
-          </span>
-        ))}
+      <div className="wallet-strip-wrap">
+        <div className="wallet-strip" aria-label="积分">
+          {ITEMS.map(({ key, label }) => (
+            <span key={key}>
+              {label} <strong>{credits(wallet[key])}</strong>
+            </span>
+          ))}
+        </div>
+        <PendingNote wallet={wallet} />
       </div>
     );
   }
 
   return (
-    <div className={compact ? 'wallet-grid wallet-grid-compact' : 'wallet-grid'}>
-      {ITEMS.map(({ key, label, note, icon: Icon, tone }) => (
-        <article className={`wallet-card wallet-${tone}`} key={key}>
-          <div>
-            <span>{label}</span>
-            <Icon aria-hidden="true" />
-          </div>
-          <strong>{credits(wallet[key])}</strong>
-          <small>{note}</small>
-          <span className="pulse-disclosure">演示积分 / 非真实法币</span>
-        </article>
-      ))}
+    <div className="wallet-grid-wrap">
+      <div className={compact ? 'wallet-grid wallet-grid-compact' : 'wallet-grid'}>
+        {ITEMS.map(({ key, label, note, icon: Icon, tone }) => (
+          <article className={`wallet-card wallet-${tone}`} key={key}>
+            <div>
+              <span>{label}</span>
+              <Icon aria-hidden="true" />
+            </div>
+            <strong>{credits(wallet[key])}</strong>
+            <small>{note}</small>
+          </article>
+        ))}
+      </div>
+      <PendingNote wallet={wallet} />
     </div>
   );
 }

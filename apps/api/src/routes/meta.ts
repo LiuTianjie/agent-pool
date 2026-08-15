@@ -382,8 +382,8 @@ const actionContracts: Record<
         adapter: { enum: ['codex', 'claude', 'mock'] },
         model: { type: 'string', minLength: 1, maxLength: 120 },
         deliveryMode: { enum: ['platform', 'webhook'], default: 'platform' },
-        unitCount: { type: 'integer', minimum: 1, maximum: 20_000 },
-        requiredConcurrency: { type: 'integer', minimum: 1, maximum: 20_000 },
+        unitCount: { type: 'integer', minimum: 1, maximum: 1_000_000 },
+        requiredConcurrency: { type: 'integer', minimum: 1, maximum: 10_000 },
         maxUnitSeconds: { type: 'integer', minimum: 10, maximum: 3_600 },
         deadlineAt: { type: 'string', format: 'date-time' },
       },
@@ -541,7 +541,6 @@ const createPoolJsonSchema = {
     'maxUnitSeconds',
     'deadlineAt',
     'rewardPerUnit',
-    'units',
   ],
   properties: {
     title: { type: 'string', minLength: 3, maxLength: 120 },
@@ -550,7 +549,7 @@ const createPoolJsonSchema = {
     secretInstruction: { type: 'string', minLength: 8, maxLength: 20_000 },
     requestedAgent: { enum: ['codex', 'claude', 'mock'] },
     requestedModel: { type: 'string', minLength: 1, maxLength: 120 },
-    requiredConcurrency: { type: 'integer', minimum: 1, maximum: 20_000 },
+    requiredConcurrency: { type: 'integer', minimum: 1, maximum: 10_000 },
     maxUnitSeconds: { type: 'integer', minimum: 10, maximum: 3_600 },
     deadlineAt: { type: 'string', format: 'date-time' },
     rewardPerUnit: { type: 'integer', minimum: 1, maximum: 1_000_000 },
@@ -581,6 +580,26 @@ const createPoolJsonSchema = {
     },
     launchMode: { enum: ['pilot', 'immediate'], default: 'immediate' },
     pilotUnits: { type: 'integer', minimum: 1, maximum: 3, default: 3 },
+    dataset: {
+      default: { mode: 'inline' },
+      oneOf: [
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['mode'],
+          properties: { mode: { const: 'inline' } },
+        },
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['mode', 'url'],
+          properties: {
+            mode: { const: 'https' },
+            url: { type: 'string', format: 'uri', maxLength: 2_048 },
+          },
+        },
+      ],
+    },
     units: {
       type: 'array',
       minItems: 2,

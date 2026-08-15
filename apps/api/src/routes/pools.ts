@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 
-import { createPoolSchema, type TaskCapsule } from '@agent-pool/shared';
+import { createPoolSchema, type CreatePoolInput, type TaskCapsule } from '@agent-pool/shared';
 import { z } from 'zod';
 
 import { ownerAuth } from '../auth.js';
 import { decryptJson, encryptJson } from '../crypto.js';
+import { indexHttpsDataset } from '../dataset-index.js';
 import { safeInteger } from '../db.js';
 import { ApiError, invariant } from '../errors.js';
 import { withIdempotentTransaction } from '../idempotency.js';
@@ -45,22 +46,24 @@ const createPoolRequestSchema = createPoolSchema
         });
       }
     }
-    if (value.requiredConcurrency > value.units.length) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['requiredConcurrency'],
-        message: 'requiredConcurrency cannot exceed the number of units',
-      });
-    }
-    value.units.forEach((unit, index) => {
-      if (!Object.prototype.hasOwnProperty.call(unit, 'input') || unit.input === undefined) {
+    if (value.dataset.mode === 'inline') {
+      if (value.requiredConcurrency > (value.units?.length ?? 0)) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ['units', index, 'input'],
-          message: 'input is required and must be JSON-serializable',
+          path: ['requiredConcurrency'],
+          message: 'requiredConcurrency cannot exceed the number of units',
         });
       }
-    });
+      value.units?.forEach((unit, index) => {
+        if (!Object.prototype.hasOwnProperty.call(unit, 'input') || unit.input === undefined) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['units', index, 'input'],
+            message: 'input is required and must be JSON-serializable',
+          });
+        }
+      });
+    }
     if (new Date(value.deadlineAt).getTime() <= Date.now() + 10_000) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -96,9 +99,10 @@ export async function registerPoolRoutes(app: App): Promise<void> {
     { preHandler: ownerAuth(app, 'pools:write'), bodyLimit: 25 * 1024 * 1024 },
     async (request) => {
       const input = createPoolRequestSchema.parse(request.body);
+      const resolved = await resolvePublishUnits(app, input);
       const taskCapsule = normalizeTaskCapsule(input);
-      validateTaskContractInput(input, taskCapsule);
-      const totalCost = input.units.length * input.rewardPerUnit;
+      validateTaskContractInput(input, taskCapsule, resolved.units);
+      const totalCost = resolved.units.length * input.rewardPerUnit;
       invariant(
         Number.isSafeInteger(totalCost),
         400,
@@ -108,7 +112,7 @@ export async function registerPoolRoutes(app: App): Promise<void> {
       const capacityQuote = await quoteCapacity(app.db, {
         adapter: input.requestedAgent,
         model: input.requestedModel,
-        unitCount: input.units.length,
+        unitCount: resolved.units.length,
         requiredConcurrency: input.requiredConcurrency,
         maxUnitSeconds: input.maxUnitSeconds,
         deadlineAt: new Date(input.deadlineAt),
@@ -118,8 +122,9 @@ export async function registerPoolRoutes(app: App): Promise<void> {
         valid: true,
         taskCapsule,
         contractHash: contractHash(taskCapsule),
-        totalUnits: input.units.length,
+        totalUnits: resolved.units.length,
         totalCost,
+        dataset: resolved.dataset,
         capacityQuote,
         defaults: {
           maxAttempts: input.maxAttempts,
@@ -127,7 +132,7 @@ export async function registerPoolRoutes(app: App): Promise<void> {
           deliveryMode: input.deliveryTarget.mode,
           launchMode: input.launchMode,
           pilotUnits:
-            input.launchMode === 'pilot' ? Math.min(input.pilotUnits, input.units.length) : 0,
+            input.launchMode === 'pilot' ? Math.min(input.pilotUnits, resolved.units.length) : 0,
         },
       };
     },
@@ -138,6 +143,11 @@ export async function registerPoolRoutes(app: App): Promise<void> {
     { preHandler: ownerAuth(app, 'pools:write'), bodyLimit: 25 * 1024 * 1024 },
     async (request, reply) => {
       const ownerId = request.authUser!.id;
+      const input = createPoolRequestSchema.parse(request.body);
+      const resolved = await resolvePublishUnits(app, input);
+      const units = resolved.units;
+      const capsule = normalizeTaskCapsule(input);
+      validateTaskContractInput(input, capsule, units);
       const response = await withIdempotentTransaction(
         app.db,
         request,
@@ -145,18 +155,12 @@ export async function registerPoolRoutes(app: App): Promise<void> {
         ownerId,
         'pools.create',
         async (client) => {
-          // Every request-dependent operation belongs after the idempotency lookup.
-          // A successful response remains replayable even when dynamic constraints,
-          // such as deadlineAt, would reject the same payload later.
-          const input = createPoolRequestSchema.parse(request.body);
-          const capsule = normalizeTaskCapsule(input);
-          validateTaskContractInput(input, capsule);
           const poolId = randomUUID();
           const taskContractHash = contractHash(capsule);
           const pilotUnits =
-            input.launchMode === 'pilot' ? Math.min(input.pilotUnits, input.units.length) : 0;
-          const pilotOrdinals = spreadPilotOrdinals(input.units.length, pilotUnits);
-          const totalCost = input.units.length * input.rewardPerUnit;
+            input.launchMode === 'pilot' ? Math.min(input.pilotUnits, units.length) : 0;
+          const pilotOrdinals = spreadPilotOrdinals(units.length, pilotUnits);
+          const totalCost = units.length * input.rewardPerUnit;
           invariant(
             Number.isSafeInteger(totalCost),
             400,
@@ -170,7 +174,7 @@ export async function registerPoolRoutes(app: App): Promise<void> {
           const quote = await quoteCapacity(client, {
             adapter: input.requestedAgent,
             model: input.requestedModel,
-            unitCount: input.units.length,
+            unitCount: units.length,
             requiredConcurrency: input.requiredConcurrency,
             maxUnitSeconds: input.maxUnitSeconds,
             deadlineAt: deadline,
@@ -225,10 +229,11 @@ export async function registerPoolRoutes(app: App): Promise<void> {
              validation_mode, output_schema, max_attempts, required_concurrency,
              max_unit_seconds, deadline_at, total_units, status,
              task_capsule_ciphertext, contract_hash, delivery_mode,
-             delivery_config_ciphertext, launch_mode, pilot_units, legacy_contract
+             delivery_config_ciphertext, launch_mode, pilot_units, legacy_contract,
+             dataset_mode, dataset_host, dataset_url_ciphertext
            ) VALUES (
              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-             $18, $19, $20, $21, $22, $23, $24
+             $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
            )`,
             [
               poolId,
@@ -248,7 +253,7 @@ export async function registerPoolRoutes(app: App): Promise<void> {
               input.requiredConcurrency,
               input.maxUnitSeconds,
               deadline,
-              input.units.length,
+              units.length,
               status,
               encryptJson(capsule, app.config.encryptionKey),
               taskContractHash,
@@ -265,19 +270,26 @@ export async function registerPoolRoutes(app: App): Promise<void> {
               input.launchMode,
               pilotUnits,
               !input.taskCapsule,
+              resolved.dataset.mode,
+              resolved.dataset.mode === 'https' ? resolved.dataset.host : null,
+              resolved.dataset.mode === 'https'
+                ? encryptJson(resolved.dataset.url, app.config.encryptionKey)
+                : null,
             ],
           );
 
           const chunkSize = 500;
-          for (let start = 0; start < input.units.length; start += chunkSize) {
-            const chunk = input.units.slice(start, start + chunkSize);
+          const storeInlineInput = resolved.dataset.mode === 'inline';
+          for (let start = 0; start < units.length; start += chunkSize) {
+            const chunk = units.slice(start, start + chunkSize);
             await client.query(
               `INSERT INTO task_units
                (id, pool_id, ordinal, label_ciphertext, input_ciphertext,
-                expected_output_ciphertext, status, is_pilot)
+                expected_output_ciphertext, status, is_pilot,
+                input_sha256, source_offset, source_length)
              SELECT * FROM unnest(
                $1::uuid[], $2::uuid[], $3::int[], $4::text[], $5::text[], $6::text[],
-               $7::text[], $8::boolean[]
+               $7::text[], $8::boolean[], $9::text[], $10::bigint[], $11::int[]
              )`,
               [
                 chunk.map(() => randomUUID()),
@@ -288,7 +300,9 @@ export async function registerPoolRoutes(app: App): Promise<void> {
                     ? null
                     : encryptJson(unit.label, app.config.encryptionKey),
                 ),
-                chunk.map((unit) => encryptJson(unit.input, app.config.encryptionKey)),
+                chunk.map((unit) =>
+                  storeInlineInput ? encryptJson(unit.input, app.config.encryptionKey) : null,
+                ),
                 chunk.map((unit) =>
                   unit.expectedOutput === undefined
                     ? null
@@ -300,6 +314,9 @@ export async function registerPoolRoutes(app: App): Promise<void> {
                     : 'queued',
                 ),
                 chunk.map((_, index) => pilotOrdinals.has(start + index)),
+                chunk.map((unit) => unit.inputSha256 ?? null),
+                chunk.map((unit) => unit.sourceOffset ?? null),
+                chunk.map((unit) => unit.sourceLength ?? null),
               ],
             );
           }
@@ -557,7 +574,7 @@ export async function registerPoolRoutes(app: App): Promise<void> {
         id: string;
         ordinal: number;
         label_ciphertext: string | null;
-        input_ciphertext: string;
+        input_ciphertext: string | null;
         result_ciphertext: string | null;
         status: string;
         attempt_count: number;
@@ -612,7 +629,9 @@ export async function registerPoolRoutes(app: App): Promise<void> {
           label: row.label_ciphertext
             ? decryptJson(row.label_ciphertext, app.config.encryptionKey)
             : undefined,
-          input: decryptJson(row.input_ciphertext, app.config.encryptionKey),
+          input: row.input_ciphertext
+            ? decryptJson(row.input_ciphertext, app.config.encryptionKey)
+            : undefined,
           result: row.result_ciphertext
             ? decryptJson(row.result_ciphertext, app.config.encryptionKey)
             : undefined,
@@ -778,6 +797,45 @@ function mapOwnedPool(row: Record<string, unknown>, app: App) {
     contractHash: contractHashFromPoolRow(row),
     deliveryTarget,
     launchMode: row.launch_mode === 'pilot' ? 'pilot' : 'immediate',
+  };
+}
+
+type PublishUnit = {
+  label?: string;
+  input: unknown;
+  expectedOutput?: unknown;
+  inputSha256?: string;
+  sourceOffset?: number;
+  sourceLength?: number;
+};
+
+async function resolvePublishUnits(
+  app: App,
+  input: CreatePoolInput,
+): Promise<{
+  units: PublishUnit[];
+  dataset: { mode: 'inline' } | { mode: 'https'; url: string; host: string };
+}> {
+  if (input.dataset.mode !== 'https') {
+    return {
+      units: (input.units ?? []).map((unit) => ({
+        label: unit.label,
+        input: unit.input,
+        expectedOutput: unit.expectedOutput,
+      })),
+      dataset: { mode: 'inline' },
+    };
+  }
+  const indexed = await indexHttpsDataset(input.dataset.url, app.datasetFetch);
+  invariant(
+    input.requiredConcurrency <= indexed.units.length,
+    400,
+    'VALIDATION_ERROR',
+    'requiredConcurrency cannot exceed the number of units',
+  );
+  return {
+    units: indexed.units,
+    dataset: { mode: 'https', url: input.dataset.url, host: indexed.host },
   };
 }
 

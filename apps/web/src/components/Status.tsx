@@ -7,7 +7,7 @@ const POOL_LABELS: Record<PoolLifecycleStatus, string> = {
   draft: '草稿',
   waiting_capacity: '开放领取',
   queued: '开放领取',
-  piloting: 'Pilot 开放领取',
+  piloting: '试跑开放领取',
   running: '运行中',
   paused: '已暂停',
   completed: '已完成',

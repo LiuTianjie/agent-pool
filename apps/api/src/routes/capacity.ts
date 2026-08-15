@@ -1,4 +1,8 @@
-import { agentAdapterSchema } from '@agent-pool/shared';
+import {
+  DATASET_UNIT_MAX,
+  REQUIRED_CONCURRENCY_MAX,
+  agentAdapterSchema,
+} from '@agent-pool/shared';
 import { z } from 'zod';
 
 import { getCapacitySnapshot, quoteCapacity } from '../services.js';
@@ -10,8 +14,8 @@ const quoteSchema = z
     adapter: agentAdapterSchema,
     model: z.string().trim().min(1).max(120),
     deliveryMode: z.enum(['platform', 'webhook']).default('platform'),
-    unitCount: z.number().int().min(1).max(20_000),
-    requiredConcurrency: z.number().int().min(1).max(20_000),
+    unitCount: z.number().int().min(1).max(DATASET_UNIT_MAX),
+    requiredConcurrency: z.number().int().min(1).max(REQUIRED_CONCURRENCY_MAX),
     maxUnitSeconds: z.number().int().min(10).max(3_600),
     deadlineAt: z.string().datetime({ offset: true }),
   })

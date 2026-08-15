@@ -1,5 +1,5 @@
 import type { LiveEvent } from '@agent-pool/shared';
-import { ArrowRight, Blocks, Plus, RadioTower, Server, Sparkles } from 'lucide-react';
+import { ArrowRight, Blocks, Plus, RadioTower, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { EmptyState, InlineError, LoadingState } from '../components/LoadingState';
@@ -48,7 +48,7 @@ export function DashboardPage() {
 
   const { state } = useLiveEvents(onLiveEvent);
 
-  if (loading && !data) return <LoadingState label="正在汇集网络状态" />;
+  if (loading && !data) return <LoadingState label="正在加载" />;
   if (error && !data) return <InlineError message={error} retry={() => void load()} />;
   if (!data) return null;
 
@@ -59,9 +59,9 @@ export function DashboardPage() {
   return (
     <div className="page dashboard-page">
       <PageHeader
-        eyebrow="CONTROL ROOM / LIVE"
-        title={`${user?.displayName || '你好'}，网络正在流动。`}
-        description="发布任务池，或观察 Agent 正在把小单元逐个变成交付。"
+        eyebrow="控制台"
+        title={`${user?.displayName || '你好'}，任务正在进行。`}
+        description="发布任务，或看正在做的进度。"
         actions={<LiveStatus state={state} />}
       />
 
@@ -84,11 +84,11 @@ export function DashboardPage() {
             </div>
             <dl>
               <div>
-                <dt>活跃任务池</dt>
+                <dt>进行中的任务</dt>
                 <dd>{data.network.activePools.toLocaleString('zh-CN')}</dd>
               </div>
               <div>
-                <dt>等待 Units</dt>
+                <dt>等待中的任务</dt>
                 <dd>{data.network.queuedUnits.toLocaleString('zh-CN')}</dd>
               </div>
               <div>
@@ -104,8 +104,8 @@ export function DashboardPage() {
                 <Plus aria-hidden="true" />
               </span>
               <div>
-                <strong>发布任务池</strong>
-                <small>把数据切成独立 Units</small>
+                <strong>发布一批任务</strong>
+                <small>写说明，放上数据</small>
               </div>
               <ArrowRight aria-hidden="true" />
             </Link>
@@ -116,7 +116,7 @@ export function DashboardPage() {
       <section className="page-section">
         <div className="section-bar">
           <div>
-            <h2>正在发布的任务池</h2>
+            <h2>进行中的任务</h2>
           </div>
           <span />
         </div>
@@ -128,11 +128,11 @@ export function DashboardPage() {
           </div>
         ) : (
           <EmptyState
-            title="池子现在很安静"
-            detail="发布一组可拆分的小任务，网络会按指定 Agent、模型和容量精准匹配。"
+            title="现在还没有进行中的任务"
+            detail="发布一组能拆开做的小任务。"
             action={
               <Link className="button button-primary" to="/app/pools/new">
-                <Blocks aria-hidden="true" /> 创建任务池
+                <Blocks aria-hidden="true" /> 发布一批任务
               </Link>
             }
           />
@@ -142,14 +142,7 @@ export function DashboardPage() {
       {activePools.length ? (
         <aside className="privacy-strip">
           <Sparkles aria-hidden="true" />
-          <strong>执行端默认只看见：</strong>
-          <span>公开摘要</span>
-          <span>Agent / 模型要求</span>
-          <span>进度</span>
-          <span>PULSE 奖励</span>
-          <span className="privacy-not">
-            <Server aria-hidden="true" /> 不显示任务内容与交付结果
-          </span>
+          <span>进度里看不到题目和答案。</span>
         </aside>
       ) : null}
     </div>

@@ -54,14 +54,13 @@ export function PoolCard({ pool }: { pool: PoolSummary }) {
       </div>
       <footer>
         <span>
-          <Boxes aria-hidden="true" /> {pool.totalUnits.toLocaleString('zh-CN')} Units
+          <Boxes aria-hidden="true" /> {pool.totalUnits.toLocaleString('zh-CN')} 条任务
         </span>
         <span>
           <Clock3 aria-hidden="true" /> 截止 {dateTime(pool.deadlineAt)}
         </span>
         <span className="pool-pulse-reward">
-          {credits(pool.rewardPerUnit)} / Unit
-          <small>演示积分 / 非真实法币</small>
+          {credits(pool.rewardPerUnit)} / 条
         </span>
         <ArrowUpRight aria-hidden="true" />
       </footer>

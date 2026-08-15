@@ -23,7 +23,7 @@ import {
 import type { RunnerMarketPool, RunnerNodePublic } from '../lib/types';
 
 const MARKET_STATUS: Partial<Record<RunnerMarketPool['status'], string>> = {
-  piloting: '点火批次开放领取',
+  piloting: '试跑中',
   waiting_capacity: '开放领取',
   queued: '开放领取',
   running: '执行中 / 仍可领取',
@@ -97,7 +97,7 @@ export function RunnerClaimMarket({
             <Target />
           </span>
           <span>
-            <h2>选一台 Runner，抢这一批</h2>
+            <h2>选一台，领一批</h2>
           </span>
         </div>
       </header>
@@ -105,15 +105,13 @@ export function RunnerClaimMarket({
       <div className="runner-market-rule">
         <RadioTower aria-hidden="true" />
         <p>
-          <strong>上线不等于接单。</strong>
-          平台不会后台扫单或自动派发。只有你选择具体 Runner、Pool 和数量，并在那台机器运行一次性
-          Claim 命令，才会创建短期 Grant 并开始这一批。
+          上线之后，还要在这台机器上运行领取命令。
         </p>
       </div>
 
       {loading ? (
         <div className="runner-market-state" role="status">
-          <RadioTower aria-hidden="true" /> 正在比对公开 Pool 与你的有效认证…
+          <RadioTower aria-hidden="true" /> 正在查找可领的任务…
         </div>
       ) : error ? (
         <div className="runner-market-state runner-market-error" role="alert">
@@ -125,13 +123,13 @@ export function RunnerClaimMarket({
         </div>
       ) : !nodes.length ? (
         <div className="runner-market-state">
-          <Bot aria-hidden="true" /> 还没有 Runner。先完成下方安装、登录和 benchmark，再回来领取。
+          <Bot aria-hidden="true" /> 还没有机器。先完成下面的安装和登录。
         </div>
       ) : (
         <div className="runner-market-body">
           <div className="runner-market-picker">
             <label>
-              <span>01 / 具体 Runner 或 Cell</span>
+              <span>01 / 用哪台</span>
               <select value={nodeId} onChange={(event) => setNodeId(event.target.value)}>
                 {nodes.map((node) => (
                   <option value={node.id} key={node.id}>
@@ -162,16 +160,16 @@ export function RunnerClaimMarket({
             ) : null}
 
             <label>
-              <span>02 / 精确匹配的 Pool</span>
+              <span>02 / 领哪一批</span>
               <select
                 value={poolId}
                 disabled={!matchedPools.length}
                 onChange={(event) => setPoolId(event.target.value)}
               >
-                {!matchedPools.length ? <option value="">没有可领取的精确匹配</option> : null}
+                {!matchedPools.length ? <option value="">现在没有可领的</option> : null}
                 {matchedPools.map((pool) => (
                   <option value={pool.id} key={pool.id}>
-                    {pool.title} · {pool.queuedUnits} Units · {credits(pool.rewardPerUnit)}
+                    {pool.title} · {pool.queuedUnits} 条任务 · {credits(pool.rewardPerUnit)}
                   </option>
                 ))}
               </select>
@@ -181,8 +179,7 @@ export function RunnerClaimMarket({
               <div className="runner-market-no-match">
                 <Cpu aria-hidden="true" />
                 <span>
-                  这台 Runner 当前没有可领取的精确匹配。需要 Agent、model、有效 benchmark、P95
-                  时限和 Webhook 权限全部吻合；离线不影响匹配，运行 Claim 命令时会连接。
+                  这台现在没有可领的任务。需要执行器和模型对得上。
                 </span>
               </div>
             ) : null}
@@ -196,26 +193,26 @@ export function RunnerClaimMarket({
                     <span>{MARKET_STATUS[selectedPool.status] || selectedPool.status}</span>
                     <h3>{selectedPool.title}</h3>
                   </div>
-                  <strong>{credits(selectedPool.rewardPerUnit)} / UNIT</strong>
+                  <strong>{credits(selectedPool.rewardPerUnit)} / 条</strong>
                 </header>
                 <p>{selectedPool.publicSummary}</p>
                 <dl>
                   <div>
-                    <dt>EXACT TARGET</dt>
+                    <dt>指定执行器</dt>
                     <dd>
                       {selectedPool.requestedAgent} / {selectedPool.requestedModel}
                     </dd>
                   </div>
                   <div>
-                    <dt>DELIVERY</dt>
-                    <dd>{selectedPool.deliveryMode.toUpperCase()}</dd>
+                    <dt>结果去向</dt>
+                    <dd>{selectedPool.deliveryMode === 'webhook' ? '发到对方地址' : '保存在这里'}</dd>
                   </div>
                   <div>
-                    <dt>AVAILABLE NOW</dt>
-                    <dd>{selectedPool.queuedUnits.toLocaleString('zh-CN')} Units</dd>
+                    <dt>现在可领</dt>
+                    <dd>{selectedPool.queuedUnits.toLocaleString('zh-CN')} 条任务</dd>
                   </div>
                   <div>
-                    <dt>SIMULTANEOUS LIMIT</dt>
+                    <dt>同时执行上限</dt>
                     <dd>{selectedPool.requiredConcurrency}</dd>
                   </div>
                 </dl>
@@ -223,7 +220,7 @@ export function RunnerClaimMarket({
                 <div className="runner-market-proof">
                   <CheckCircle2 aria-hidden="true" />
                   <span>
-                    <strong>有效自托管正确性 / 性能证据</strong>
+                    <strong>这台对得上</strong>
                     {matchingCertification ? (
                       <small>
                         P95 {duration(matchingCertification.p95Ms / 1000)} · 并发证据{' '}
@@ -238,24 +235,17 @@ export function RunnerClaimMarket({
                   <div className="runner-market-webhook">
                     <Webhook aria-hidden="true" />
                     <span>
-                      <strong>直达 Webhook</strong>
-                      {selectedNode.operatorType === 'official' ? (
-                        <>
-                          该 Official Cell 已由服务端确认开启 Webhook；命令从 Cell
-                          配置读取权限，不接受额外 opt-in 参数。
-                        </>
-                      ) : (
-                        <>
-                          此命令包含显式 <code>--allow-webhooks</code>。
-                        </>
-                      )}{' '}
-                      发布者可观察 Runner 出口 IP，输出不存平台。
+                      <strong>结果发到对方地址</strong>
+                      {selectedNode.operatorType === 'official'
+                        ? '这台已经允许外发。'
+                        : '这条命令会带上允许外发。'}{' '}
+                      对方看得到你的网络来源。
                     </span>
                   </div>
                 ) : null}
 
                 <label className="runner-market-units">
-                  <span>03 / 这一批最多领取</span>
+                  <span>03 / 领几条</span>
                   <div>
                     <input
                       type="number"
@@ -266,7 +256,7 @@ export function RunnerClaimMarket({
                       value={units}
                       onChange={(event) => setUnits(Number(event.target.value))}
                     />
-                    <small>UNITS / MAX {selectedPool.queuedUnits.toLocaleString('zh-CN')}</small>
+                    <small>条 / 最多 {selectedPool.queuedUnits.toLocaleString('zh-CN')}</small>
                   </div>
                 </label>
 
@@ -274,29 +264,20 @@ export function RunnerClaimMarket({
                   <div>
                     <TerminalSquare aria-hidden="true" />
                     <span>
-                      <strong>04 / 在 {selectedNode.name} 所在机器运行</strong>
-                      <small>
-                        {selectedNode.operatorType === 'official'
-                          ? 'Official CLI 从 Cell 配置选择精确 Agent / model / Webhook 能力；命令只接受 Pool 与数量。'
-                          : 'Community CLI 用命令里的 Agent / model / Webhook opt-in 创建精确 Grant。'}{' '}
-                        复制本身不会接单；运行后才开始，并在额度用完、过期或中断后退出。
-                      </small>
+                      <strong>04 / 在 {selectedNode.name} 上运行</strong>
+                      <small>复制还不会开始，运行之后才领。</small>
                     </span>
                   </div>
                   <CopyCommand command={command} />
                   <p className="runner-market-pick-alt">
-                    不想从网页复制？也可运行{' '}
-                    <code>{runnerPickCommand(selectedNode, selectedPool)}</code>{' '}
-                    在终端查看公开任务、选编号与数量。
+                    也可以在终端运行 <code>{runnerPickCommand(selectedNode, selectedPool)}</code>{' '}
+                    自己选。
                   </p>
                 </div>
                 <div className="runner-market-return">
                   <Clock3 aria-hidden="true" />
-                  一次性 Claim · 最多 {safeUnits} Units · 完成后回到待命
-                  <span>
-                    最多可赚 {credits(safeUnits * selectedPool.rewardPerUnit)} · 演示积分 /
-                    非真实法币
-                  </span>
+                  这一批最多 {safeUnits} 条
+                  <span>最多可赚 {credits(safeUnits * selectedPool.rewardPerUnit)}</span>
                 </div>
               </>
             </div>

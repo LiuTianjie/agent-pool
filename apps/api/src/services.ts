@@ -541,6 +541,8 @@ export function mapPoolSummary(
     pilotFailedUnits: safeInteger((row.pilot_failed_units as string) ?? 0),
     pilotSubmittedUnits: safeInteger((row.pilot_submitted_units as string) ?? 0),
     contractHash: contractHashFromPoolRow(row),
+    datasetMode: row.dataset_mode === 'https' ? 'https' : 'inline',
+    datasetHost: typeof row.dataset_host === 'string' && row.dataset_host ? row.dataset_host : null,
     createdAt: new Date(String(row.created_at)).toISOString(),
     requiredConcurrency: safeInteger(row.required_concurrency as number),
     maxUnitSeconds: safeInteger(row.max_unit_seconds as number),

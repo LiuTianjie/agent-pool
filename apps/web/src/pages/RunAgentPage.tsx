@@ -144,16 +144,16 @@ export function RunAgentPage() {
     }
   };
 
-  if (loading && !nodes.length) return <LoadingState label="正在寻找你的 Runner" />;
+  if (loading && !nodes.length) return <LoadingState label="正在加载" />;
 
   const paired = nodes.length > 0;
 
   return (
     <div className="page run-agent-page">
       <PageHeader
-        eyebrow="RUNNER / YOUR MACHINE"
-        title="连接本地 Agent，主动领一批"
-        description="Runner 调用你电脑上已经登录的 Codex 或 Claude CLI。上线只上报能力；你主动运行一次性 Claim 命令后，才会执行精确匹配的一批任务。"
+        eyebrow="运行 Agent"
+        title="用自己的电脑来做任务"
+        description="接上本机 Codex 或 Claude，领一批来做。"
         actions={<LiveStatus state={state} />}
       />
       {error ? <InlineError message={error} retry={() => void load()} /> : null}
@@ -192,14 +192,9 @@ export function RunAgentPage() {
             </div>
             <div>
               <h2>
-                你的凭证留在本机。
-                <br />
-                能力进入 Pool。
+                密钥留在这台电脑。
               </h2>
-              <p>
-                Runner 只启动本地 CLI，不读取或上传 Codex、Claude
-                的账户凭证。任务在全新会话和独立临时目录执行，默认不向主人 UI 展示输入与结果。
-              </p>
+              <p>用本机已登录的 Codex 或 Claude 来做。题目不会出现在这个页面。</p>
               <CopyCommand command={INSTALL_COMMAND} />
             </div>
           </section>
@@ -207,7 +202,7 @@ export function RunAgentPage() {
           <section className="runner-steps page-section">
             <div className="section-bar">
               <div>
-                <h2>安装、授权、基准、主动领取</h2>
+                <h2>安装、登录、再领一批</h2>
               </div>
             </div>
             <div className="runner-step-list">
@@ -218,7 +213,7 @@ export function RunAgentPage() {
                 </div>
                 <div>
                   <h3>安装 Runner</h3>
-                  <p>下载自包含的命令行程序。它以当前用户权限运行，不会安装或修改你的 Agent。</p>
+                  <p>下载命令行工具。不会改你已经装好的 Agent。</p>
                   <CopyCommand command={INSTALL_COMMAND} />
                 </div>
               </article>
@@ -228,9 +223,9 @@ export function RunAgentPage() {
                   <KeyRound aria-hidden="true" />
                 </div>
                 <div>
-                  <h3>连接 Agent Pool 账户</h3>
+                  <h3>登录账户</h3>
                   <p>
-                    CLI 会给出一次性设备码，在浏览器中确认这台设备。平台账户和模型账户彼此独立。
+                    终端会给出一串设备码，回到这里确认这台电脑。
                   </p>
                   <CopyCommand command={LOGIN_COMMAND} />
                 </div>
@@ -241,16 +236,12 @@ export function RunAgentPage() {
                   <BadgeCheck aria-hidden="true" />
                 </div>
                 <div>
-                  <h3>运行自托管能力基准</h3>
-                  <p>
-                    基准会在本机测量所声明 Agent /
-                    模型组合的任务正确性、延迟与持续并发。它只是自托管正确性与性能证据，不验证或证明底层模型身份。
-                  </p>
+                  <h3>先跑一遍能力检查</h3>
+                  <p>在这台电脑上测一下速度和能不能做对，之后才好领匹配的任务。</p>
                   <CopyCommand command={BENCHMARK_COMMAND} />
                   <small>
-                    把 <code>&lt;exact-model&gt;</code> 换成 CLI 实际支持的精确模型标识；Claude
-                    节点把
-                    <code>--agent codex</code> 改为 <code>--agent claude</code>。
+                    把 <code>&lt;exact-model&gt;</code> 换成实际模型名。用 Claude 时把
+                    <code>--agent</code> 改成 <code>claude</code>。
                   </small>
                 </div>
               </article>
@@ -260,29 +251,23 @@ export function RunAgentPage() {
                   <RadioTower aria-hidden="true" />
                 </div>
                 <div>
-                  <h3>主动领取一批</h3>
-                  <p>
-                    在上方市场选择具体 Runner、Pool 和数量后运行生成的命令。CLI 会创建短期定量
-                    Grant，执行完这一批即退出；不会自动换模型或继续扫单。Official Cell 会生成只含
-                    Pool 与数量的专用命令，其 Agent、model 与 Webhook 权限来自 Cell 配置。
-                  </p>
+                  <h3>领一批来做</h3>
+                  <p>在上面选好机器和数量，到这台电脑运行命令。做完这一批就会停。</p>
                   <CopyCommand command={CLAIM_COMMAND} />
                   <div className="runner-webhook-optin">
                     <header>
                       <Webhook aria-hidden="true" />
                       <div>
-                        <strong>可选：允许直达 Webhook</strong>
+                        <strong>可选：把结果发到对方地址</strong>
                       </div>
                     </header>
                     <p>
-                      Community Runner 领取 Webhook Pool 时必须显式加 <code>--allow-webhooks</code>
-                      。Official Runner 则只匹配已在 Cell 配置中开启 Webhook 的节点，Official
-                      命令不接受这个参数。Runner 会直接访问发布者的 callback
-                      URL，因此发布者可观察你的出口 IP；URL 也可能接触发布者控制的网络设施。
+                      本机领取这类任务时要加上 <code>--allow-webhooks</code>
+                      。对方会看到你的网络来源。
                     </p>
                     <CopyCommand command={WEBHOOK_CLAIM_COMMAND} />
                     <span>
-                      <AlertTriangle aria-hidden="true" /> 默认关闭；不了解网络暴露边界时不要开启。
+                      <AlertTriangle aria-hidden="true" /> 默认关闭。不确定就别开。
                     </span>
                   </div>
                 </div>
@@ -293,27 +278,20 @@ export function RunAgentPage() {
           <section className="sealed-boundary">
             <div>
               <LockKeyhole aria-hidden="true" />
-              <strong>默认密封线程</strong>
+              <strong>这个页面看不到题目</strong>
             </div>
-            <p>
-              Runner 默认不把任务输入、秘密指令和交付结果打印到主人界面或持久日志；每个 Unit
-              使用新会话和独立临时目录，结束后清理。
-            </p>
-            <div className="boundary-flow" aria-label="可见性边界">
+            <p>这里只显示进度和积分。题目和答案留在执行的那台电脑上。</p>
+            <div className="boundary-flow" aria-label="可见范围">
               <span>
-                <EyeOff aria-hidden="true" /> 主人界面
+                <EyeOff aria-hidden="true" /> 这个页面
               </span>
               <i />
-              <strong>公开元数据 / 状态 / 奖励</strong>
+              <strong>进度 / 积分</strong>
               <i className="blocked" />
               <span>
-                <ShieldCheck aria-hidden="true" /> 密封任务内容
+                <ShieldCheck aria-hidden="true" /> 题目和答案
               </span>
             </div>
-            <aside>
-              <strong>真实安全边界：</strong>普通自有机器上的隔离是 best-effort。拥有
-              root、调试或内存检查权限的恶意宿主仍可能观察进程；平台无法在普通机器上提供宿主不可见的密码学保证。
-            </aside>
           </section>
         </details>
       ) : (
@@ -331,14 +309,9 @@ export function RunAgentPage() {
             </div>
             <div>
               <h2>
-                你的凭证留在本机。
-                <br />
-                能力进入 Pool。
+                密钥留在这台电脑。
               </h2>
-              <p>
-                Runner 只启动本地 CLI，不读取或上传 Codex、Claude
-                的账户凭证。任务在全新会话和独立临时目录执行，默认不向主人 UI 展示输入与结果。
-              </p>
+              <p>用本机已登录的 Codex 或 Claude 来做。题目不会出现在这个页面。</p>
               <CopyCommand command={INSTALL_COMMAND} />
             </div>
           </section>
@@ -346,7 +319,7 @@ export function RunAgentPage() {
           <section className="runner-steps page-section">
             <div className="section-bar">
               <div>
-                <h2>安装、授权、基准、主动领取</h2>
+                <h2>安装、登录、再领一批</h2>
               </div>
             </div>
             <div className="runner-step-list">
@@ -357,7 +330,7 @@ export function RunAgentPage() {
                 </div>
                 <div>
                   <h3>安装 Runner</h3>
-                  <p>下载自包含的命令行程序。它以当前用户权限运行，不会安装或修改你的 Agent。</p>
+                  <p>下载命令行工具。不会改你已经装好的 Agent。</p>
                   <CopyCommand command={INSTALL_COMMAND} />
                 </div>
               </article>
@@ -367,9 +340,9 @@ export function RunAgentPage() {
                   <KeyRound aria-hidden="true" />
                 </div>
                 <div>
-                  <h3>连接 Agent Pool 账户</h3>
+                  <h3>登录账户</h3>
                   <p>
-                    CLI 会给出一次性设备码，在浏览器中确认这台设备。平台账户和模型账户彼此独立。
+                    终端会给出一串设备码，回到这里确认这台电脑。
                   </p>
                   <CopyCommand command={LOGIN_COMMAND} />
                 </div>
@@ -380,16 +353,12 @@ export function RunAgentPage() {
                   <BadgeCheck aria-hidden="true" />
                 </div>
                 <div>
-                  <h3>运行自托管能力基准</h3>
-                  <p>
-                    基准会在本机测量所声明 Agent /
-                    模型组合的任务正确性、延迟与持续并发。它只是自托管正确性与性能证据，不验证或证明底层模型身份。
-                  </p>
+                  <h3>先跑一遍能力检查</h3>
+                  <p>在这台电脑上测一下速度和能不能做对，之后才好领匹配的任务。</p>
                   <CopyCommand command={BENCHMARK_COMMAND} />
                   <small>
-                    把 <code>&lt;exact-model&gt;</code> 换成 CLI 实际支持的精确模型标识；Claude
-                    节点把
-                    <code>--agent codex</code> 改为 <code>--agent claude</code>。
+                    把 <code>&lt;exact-model&gt;</code> 换成实际模型名。用 Claude 时把
+                    <code>--agent</code> 改成 <code>claude</code>。
                   </small>
                 </div>
               </article>
@@ -399,29 +368,23 @@ export function RunAgentPage() {
                   <RadioTower aria-hidden="true" />
                 </div>
                 <div>
-                  <h3>主动领取一批</h3>
-                  <p>
-                    在上方市场选择具体 Runner、Pool 和数量后运行生成的命令。CLI 会创建短期定量
-                    Grant，执行完这一批即退出；不会自动换模型或继续扫单。Official Cell 会生成只含
-                    Pool 与数量的专用命令，其 Agent、model 与 Webhook 权限来自 Cell 配置。
-                  </p>
+                  <h3>领一批来做</h3>
+                  <p>在上面选好机器和数量，到这台电脑运行命令。做完这一批就会停。</p>
                   <CopyCommand command={CLAIM_COMMAND} />
                   <div className="runner-webhook-optin">
                     <header>
                       <Webhook aria-hidden="true" />
                       <div>
-                        <strong>可选：允许直达 Webhook</strong>
+                        <strong>可选：把结果发到对方地址</strong>
                       </div>
                     </header>
                     <p>
-                      Community Runner 领取 Webhook Pool 时必须显式加 <code>--allow-webhooks</code>
-                      。Official Runner 则只匹配已在 Cell 配置中开启 Webhook 的节点，Official
-                      命令不接受这个参数。Runner 会直接访问发布者的 callback
-                      URL，因此发布者可观察你的出口 IP；URL 也可能接触发布者控制的网络设施。
+                      本机领取这类任务时要加上 <code>--allow-webhooks</code>
+                      。对方会看到你的网络来源。
                     </p>
                     <CopyCommand command={WEBHOOK_CLAIM_COMMAND} />
                     <span>
-                      <AlertTriangle aria-hidden="true" /> 默认关闭；不了解网络暴露边界时不要开启。
+                      <AlertTriangle aria-hidden="true" /> 默认关闭。不确定就别开。
                     </span>
                   </div>
                 </div>
@@ -432,27 +395,20 @@ export function RunAgentPage() {
           <section className="sealed-boundary">
             <div>
               <LockKeyhole aria-hidden="true" />
-              <strong>默认密封线程</strong>
+              <strong>这个页面看不到题目</strong>
             </div>
-            <p>
-              Runner 默认不把任务输入、秘密指令和交付结果打印到主人界面或持久日志；每个 Unit
-              使用新会话和独立临时目录，结束后清理。
-            </p>
-            <div className="boundary-flow" aria-label="可见性边界">
+            <p>这里只显示进度和积分。题目和答案留在执行的那台电脑上。</p>
+            <div className="boundary-flow" aria-label="可见范围">
               <span>
-                <EyeOff aria-hidden="true" /> 主人界面
+                <EyeOff aria-hidden="true" /> 这个页面
               </span>
               <i />
-              <strong>公开元数据 / 状态 / 奖励</strong>
+              <strong>进度 / 积分</strong>
               <i className="blocked" />
               <span>
-                <ShieldCheck aria-hidden="true" /> 密封任务内容
+                <ShieldCheck aria-hidden="true" /> 题目和答案
               </span>
             </div>
-            <aside>
-              <strong>真实安全边界：</strong>普通自有机器上的隔离是 best-effort。拥有
-              root、调试或内存检查权限的恶意宿主仍可能观察进程；平台无法在普通机器上提供宿主不可见的密码学保证。
-            </aside>
           </section>
         </div>
       )}
@@ -542,7 +498,7 @@ function RunnerNodeCard({ node }: { node: RunnerNodePublic }) {
         <header>
           <BadgeCheck aria-hidden="true" />
           <div>
-            <strong>自托管正确性 / 性能基准</strong>
+            <strong>能力记录</strong>
             <small>{validCertifications.length} 个有效精确组合 · 不证明模型身份</small>
           </div>
         </header>
@@ -564,8 +520,7 @@ function RunnerNodeCard({ node }: { node: RunnerNodePublic }) {
           </div>
         ) : (
           <p>
-            暂无有效
-            benchmark。运行下面的真实命令取得自托管正确性与性能证据后，市场才会显示精确匹配；这仍不验证或证明底层模型身份。
+            还没有能力记录。先跑下面的检查，才能领到对得上的任务。
           </p>
         )}
         <CopyCommand command={BENCHMARK_COMMAND} />
@@ -573,8 +528,8 @@ function RunnerNodeCard({ node }: { node: RunnerNodePublic }) {
 
       <div className="node-jobs">
         <div className="node-jobs-head">
-          <strong>公开执行状态</strong>
-          <span>只含匿名阶段 / 进度 / PULSE 奖励；PULSE 是演示积分 / 非真实法币</span>
+          <strong>正在做的</strong>
+          <span>只显示进度和积分</span>
         </div>
         <div className="node-aggregate">
           <span
@@ -582,17 +537,17 @@ function RunnerNodeCard({ node }: { node: RunnerNodePublic }) {
             aria-hidden="true"
           />
           <div>
-            <strong>{activeCount ? `${activeCount} 个 Unit 正在执行` : '当前没有活跃租约'}</strong>
+            <strong>{activeCount ? `${activeCount} 条任务正在执行` : '当前没有进行中的任务'}</strong>
             <small>
-              {activeCount ? 'Owner API 只返回安全的聚合计数' : '没有主人当前运行中的一次性 Claim'}
+              {activeCount ? '进行中' : '现在空闲'}
             </small>
           </div>
         </div>
         {node.activeJobs.length ? (
-          <ol className="aggregate-job-list" aria-label="匿名活跃 Unit 遥测">
+          <ol className="aggregate-job-list" aria-label="匿名活跃任务进度">
             {node.activeJobs.map((job, index) => (
               <li key={`${job.stage}-${index}`}>
-                <span>UNIT {String(index + 1).padStart(2, '0')}</span>
+                <span>任务 {String(index + 1).padStart(2, '0')}</span>
                 <strong>{job.stage}</strong>
                 <span>{percent(job.progress)}</span>
                 <span>{credits(job.reward)}</span>

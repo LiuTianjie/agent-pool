@@ -126,9 +126,9 @@ export function SettingsPage() {
   return (
     <div className="page settings-page">
       <PageHeader
-        eyebrow="ACCOUNT / BOUNDARIES"
+        eyebrow="设置"
         title="账户设置"
-        description="管理平台身份与控制 Agent。模型账户和密钥仍只留在你自己的机器上。"
+        description="改名字，或管理谁能代你操作。模型密钥还在你自己的电脑上。"
       />
       {error ? <InlineError message={error} /> : null}
 
@@ -178,8 +178,8 @@ export function SettingsPage() {
               <ShieldCheck aria-hidden="true" />
             </span>
             <div>
-              <h2>登录边界</h2>
-              <p>平台权限和模型登录严格分离。</p>
+              <h2>这个账户管什么</h2>
+              <p>管任务和授权，不管模型登录。</p>
             </div>
           </div>
           <div className="credential-boundary">
@@ -187,7 +187,7 @@ export function SettingsPage() {
               <KeyRound aria-hidden="true" />
               <span>
                 <strong>Agent Pool</strong>
-                <small>网页、Runner 与控制 Agent 各自使用独立凭证</small>
+                <small>网站、领取工具和授权分开</small>
               </span>
             </div>
             <i aria-hidden="true" />
@@ -195,12 +195,12 @@ export function SettingsPage() {
               <KeyRound aria-hidden="true" />
               <span>
                 <strong>Codex / Claude</strong>
-                <small>只由本地 CLI 管理，平台不读取</small>
+                <small>只留在你自己的电脑</small>
               </span>
             </div>
           </div>
           <p className="settings-note">
-            Runner 只负责执行；控制 Agent 只获得你批准的平台能力。两者都拿不到浏览器密码或模型登录。
+            代你操作的工具只能做你批准过的事，拿不到模型密钥。
           </p>
         </section>
 
@@ -211,7 +211,7 @@ export function SettingsPage() {
             </span>
             <div>
               <h2>控制 Agent</h2>
-              <p>它们可以通过 CLI 或 API 代表你操作平台；每个凭证都能单独撤销。</p>
+              <p>可以让别的程序代你操作。每个授权都能单独关掉。</p>
             </div>
             <span className="credential-count">
               {credentials.filter((credential) => credentialState(credential) === 'active').length}{' '}
@@ -233,7 +233,7 @@ export function SettingsPage() {
               <Bot aria-hidden="true" />
               <span>
                 <strong>还没有控制 Agent</strong>
-                <small>在终端执行控制登录后，浏览器会让你逐项确认它能调用的平台能力。</small>
+                <small>在终端登录控制后，回到这里确认它能做什么。</small>
               </span>
             </div>
           ) : (
@@ -338,8 +338,7 @@ export function SettingsPage() {
             </div>
           )}
           <p className="settings-note control-credentials-note">
-            控制凭证不会交给正在执行任务的 Codex / Claude 子进程。撤销只影响对应控制 Agent，不会让
-            Runner 自动接单或中断其他设备。
+            关掉某个授权，不会让已经在做的任务停掉。
           </p>
         </section>
 
@@ -349,8 +348,8 @@ export function SettingsPage() {
               <LogOut aria-hidden="true" />
             </span>
             <div>
-              <h2>结束浏览器会话</h2>
-              <p>退出当前浏览器。已经授权的 Runner 或控制 Agent 不会因此自动下线。</p>
+              <h2>退出登录</h2>
+              <p>只退出这个浏览器。已经连上的机器还在。</p>
             </div>
           </div>
           <button

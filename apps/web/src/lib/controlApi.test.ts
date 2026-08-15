@@ -75,3 +75,53 @@ describe('control Agent web API', () => {
     expect(result.kind).toBe('runner');
   });
 });
+
+describe('publish pool API', () => {
+  it('checks an HTTPS dataset through /api/pools/validate', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      jsonResponse({
+        valid: true,
+        totalUnits: 48,
+        totalCost: 480,
+        dataset: { mode: 'https', url: 'https://files.example.com/batch.jsonl', host: 'files.example.com' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await api.validatePool({
+      title: 'Remote batch',
+      category: 'data',
+      publicSummary: 'Units stay at the publisher file',
+      requestedAgent: 'codex',
+      requestedModel: 'gpt-5.4',
+      requiredConcurrency: 1,
+      maxUnitSeconds: 60,
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+      rewardPerUnit: 10,
+      validationMode: 'auto',
+      taskCapsule: {
+        version: 'ap-task/1',
+        goal: 'Answer each row',
+        inputDescription: 'One JSON object per line',
+        outputDescription: 'Any non-empty result',
+        constraints: [],
+        examples: [{ input: { q: 1 }, output: 'ok' }],
+        delivery: { format: 'text', maxBytes: 1024 },
+        acceptance: { mode: 'non_empty', criteria: ['non-empty'] },
+      },
+      deliveryTarget: { mode: 'platform' },
+      launchMode: 'pilot',
+      pilotUnits: 2,
+      dataset: { mode: 'https', url: 'https://files.example.com/batch.jsonl' },
+    });
+
+    const [path, init] = fetchMock.mock.calls[0]!;
+    expect(path).toBe('/api/pools/validate');
+    expect(JSON.parse(String(init?.body)).units).toBeUndefined();
+    expect(JSON.parse(String(init?.body)).dataset).toEqual({
+      mode: 'https',
+      url: 'https://files.example.com/batch.jsonl',
+    });
+    expect(result.totalUnits).toBe(48);
+  });
+});

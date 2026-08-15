@@ -406,17 +406,28 @@ svg {
   color: var(--lime);
 }
 
+.hero-copy {
+  container-type: inline-size;
+}
+
 .hero h1 {
   max-width: 780px;
   margin: 26px 0;
   font-family: var(--mono);
   font-size: clamp(3.35rem, 6.3vw, 6.7rem);
+  /* 16cqi keeps the longest line inside its own column, not just the viewport */
+  font-size: clamp(2.75rem, min(6.3vw, 16cqi), 6.7rem);
   font-weight: 540;
   line-height: 0.98;
   letter-spacing: -0.07em;
 }
 
 .hero h1 span {
+  display: block;
+  white-space: nowrap;
+}
+
+.hero h1 .hero-title-accent {
   color: var(--lime);
 }
 
@@ -612,7 +623,7 @@ svg {
 
 .section-heading {
   display: grid;
-  grid-template-columns: 0.35fr 1fr;
+  grid-template-columns: 1fr;
   gap: 32px;
   margin-bottom: 54px;
 }
@@ -703,6 +714,17 @@ svg {
 
 .sealed-copy {
   min-width: 0;
+  container-type: inline-size;
+}
+
+.sealed-copy h2 {
+  /* 12cqi keeps each line inside this column instead of tracking the viewport */
+  font-size: clamp(2rem, min(4vw, 12cqi), 4.2rem);
+}
+
+.sealed-copy h2 span {
+  display: block;
+  white-space: nowrap;
 }
 
 .sealed-thread {
@@ -1000,6 +1022,10 @@ svg {
   font-family: var(--mono);
   font-size: 1.7rem;
   font-weight: 550;
+}
+
+.form-heading h2:first-child {
+  margin-top: 0;
 }
 
 .form-heading p {
@@ -2042,7 +2068,7 @@ code {
 /* Wallet and dashboard */
 .wallet-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   border: 1px solid var(--line);
 }
 
@@ -4373,6 +4399,11 @@ code {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.wizard-footer .button {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .wizard-footer > div > span {
@@ -7846,7 +7877,7 @@ code {
   }
 
   .hero h1 {
-    font-size: clamp(3.1rem, 6.5vw, 5.2rem);
+    font-size: clamp(2.75rem, min(6.5vw, 16cqi), 5.2rem);
   }
 
   .wallet-grid {
@@ -8145,7 +8176,7 @@ code {
   }
 
   .hero h1 {
-    font-size: clamp(2.75rem, 13vw, 4.5rem);
+    font-size: clamp(2.5rem, min(13vw, 16cqi), 4.5rem);
   }
 
   .hero-trust {
@@ -8179,10 +8210,6 @@ code {
 
   .signal-meter > div:last-child {
     border-bottom: 0;
-  }
-
-  .section-heading {
-    grid-template-columns: 1fr;
   }
 
   .mechanism {
@@ -9936,6 +9963,12 @@ code {
   color: var(--text);
   font-family: var(--mono);
   font-weight: 520;
+}
+
+.wallet-pending-note {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
 }
 
 .wizard-inline-warning {

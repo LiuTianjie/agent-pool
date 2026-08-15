@@ -1,5 +1,5 @@
-import type { CapacityQuote, LiveEvent, PoolSummary, WalletSummary } from '@agent-pool/shared';
-import type { CreatePoolWebInput, DeliveryTarget, TaskCapsule } from './taskContract';
+import type { CapacityQuote, LiveEvent, PoolSummary, TaskCapsule, WalletSummary } from '@agent-pool/shared';
+import type { CreatePoolWebInput, DeliveryTarget } from './taskContract';
 import type {
   CapacityCatalogItem,
   ApiErrorBody,
@@ -272,12 +272,12 @@ function ledgerKind(kind: string): LedgerEntry['kind'] {
 
 function ledgerDescription(row: RawLedgerEntry): string {
   const labels: Record<string, string> = {
-    dev_topup: '增加开发态可消费 PULSE',
-    pool_lock: '任务池预算流动',
-    unit_settlement: 'Unit 验收结算',
-    earning_release: '收益释放为可提现 PULSE',
+    dev_topup: '增加开发态可消费积分',
+    pool_lock: '任务预算流动',
+    unit_settlement: '任务验收结算',
+    earning_release: '收益释放为可提现积分',
     dev_withdrawal: '开发态模拟提现',
-    pool_refund: '未执行 Unit 预算退回',
+    pool_refund: '未执行任务预算退回',
   };
   return labels[row.kind] || row.kind.replaceAll('_', ' ');
 }
@@ -318,6 +318,14 @@ export interface CapacityQuoteWebRequest {
   requiredConcurrency: number;
   maxUnitSeconds: number;
   deadlineAt: string;
+}
+
+export interface ValidatePoolResult {
+  valid: true;
+  totalUnits: number;
+  totalCost: number;
+  dataset: { mode: 'inline' } | { mode: 'https'; url: string; host: string };
+  capacityQuote?: CapacityQuote;
 }
 
 async function requestCapacityQuote(input: CapacityQuoteWebRequest): Promise<CapacityQuote> {
@@ -413,6 +421,8 @@ export const api = {
   capacityQuote: requestCapacityQuote,
 
   listPools: async () => (await request<PoolListEnvelope>('/pools?limit=100&offset=0')).pools,
+  validatePool: (input: CreatePoolWebInput) =>
+    request<ValidatePoolResult>('/pools/validate', json('POST', input)),
   createPool: async (input: CreatePoolWebInput) =>
     (
       await request<{ pool: PoolSummary; capacityQuote: CapacityQuote; wallet: WalletSummary }>(

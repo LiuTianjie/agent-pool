@@ -60,9 +60,9 @@ export function OfficialFleetCard({
           <div className="official-fleet-owner">
             <ServerCog aria-hidden="true" />
             <div>
-              <small>PULSE EARNING OWNER</small>
+              <small>积分收益账户</small>
               <strong>{fleet.ownerEmail}</strong>
-              <span>官方 Runner 收益进入此 Agent Pool 账户</span>
+              <span>官方节点赚到的积分进这个账户</span>
             </div>
             <em>SERVER BOUND</em>
           </div>
@@ -70,11 +70,8 @@ export function OfficialFleetCard({
           <div className="official-fleet-manual-rule">
             <MousePointer2 aria-hidden="true" />
             <div>
-              <strong>Official 也不自动接单</strong>
-              <span>
-                待命只保持 Owner 控制与 Cell 状态。要执行任务，请在上方统一市场选择具体 Official
-                Cell、Pool 和数量，再去对应机器运行一次性 Claim 命令。
-              </span>
+              <strong>官方节点也不会自己去领</strong>
+              <span>要做的话，还是在上面选一批，再到对应机器运行命令。</span>
             </div>
           </div>
 
@@ -119,8 +116,8 @@ export function OfficialFleetCard({
               {changingMode
                 ? '正在切换节点电源…'
                 : fleet.mode === 'offline'
-                  ? '官方 Cell 已停机，无法执行新的 Claim。'
-                  : 'Cell 处于待命；没有主人运行的一次性 Claim 就不会领取 Unit。'}
+                  ? '官方 Cell 已停机，无法领取新任务。'
+                  : '待命中。要做任务，还是得运行领取命令。'}
             </span>
             <small>最后更新 {relativeTime(fleet.updatedAt)}</small>
           </div>
@@ -133,31 +130,30 @@ export function OfficialFleetCard({
           <div className="official-fleet-metrics">
             <article>
               <RadioTower aria-hidden="true" />
-              <span>CONNECTED CELLS</span>
+              <span>在线机器</span>
               <strong>
                 {fleet.nodeSummary.online} <small>/ {fleet.nodeSummary.total}</small>
               </strong>
             </article>
             <article>
               <Activity aria-hidden="true" />
-              <span>ACTIVE LEASES</span>
+              <span>正在做</span>
               <strong>{fleet.nodeSummary.activeLeases}</strong>
             </article>
             <article>
               <Zap aria-hidden="true" />
-              <span>MAX CONCURRENCY</span>
+              <span>同时最多</span>
               <strong>{totals.maxConcurrency}</strong>
             </article>
             <article>
               <Bot aria-hidden="true" />
-              <span>COMPLETED TODAY</span>
+              <span>今日完成</span>
               <strong>{completedToday.toLocaleString('zh-CN')}</strong>
             </article>
             <article className="official-earned-metric">
               <Zap aria-hidden="true" />
-              <span>EARNED TODAY</span>
+              <span>今日收益</span>
               <strong>{credits(earnedToday)}</strong>
-              <small>演示积分 / 非真实法币</small>
             </article>
           </div>
 
@@ -185,7 +181,7 @@ export function OfficialFleetCard({
             </div>
           ) : (
             <p className="official-nodes-empty">
-              当前没有 Official Cell 上报；Owner 绑定仍会保留。
+              现在还没有官方机器连上来。
             </p>
           )}
         </div>
@@ -214,13 +210,9 @@ export function OfficialFleetCard({
           <p>
             <AlertTriangle aria-hidden="true" />
             <span>
-              <strong>内容可见边界</strong>
-              平台不收集用户的 Codex / Claude
-              Key；官方节点改用平台配置的合作模型网关。合作网关、中转站与官方执行基础设施可在处理期间接触任务指令、Unit
-              输入和结果。
+              官方节点用平台自己的模型通道，任务内容会经过这些机器。
             </span>
           </p>
-          <small>Official 标记只来自服务端派生的 operatorType，不根据邮箱或节点名称推断。</small>
         </aside>
       </div>
     </section>

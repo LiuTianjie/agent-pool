@@ -1,7 +1,7 @@
 import { formatCredits } from '@agent-pool/shared';
 
 export function credits(value: number): string {
-  return `${formatCredits(value)} PULSE`;
+  return `${formatCredits(value)} 积分`;
 }
 
 export function compactNumber(value: number): string {
@@ -61,13 +61,13 @@ export function duration(seconds: number | null | undefined): string {
 }
 
 const CAPACITY_REASON_LABELS: Record<string, string> = {
-  CERTIFIED_CONCURRENCY_INSUFFICIENT: '有基准记录的总并发不足',
-  ONLINE_CONCURRENCY_INSUFFICIENT: '当前在线基准并发不足',
-  AVAILABLE_CONCURRENCY_INSUFFICIENT: '当前空闲基准并发不足',
-  NO_VALID_PERFORMANCE_CERTIFICATION: '没有有效的性能基准数据',
-  P95_EXCEEDS_UNIT_LIMIT: 'P95 执行时间超过单 Unit 时限',
-  DEADLINE_ALREADY_PASSED: '截止时间已经过去',
-  DEADLINE_NOT_FEASIBLE: '按当前 P95 与可用并发预计无法按时完成',
+  CERTIFIED_CONCURRENCY_INSUFFICIENT: '现在能同时做的人不够',
+  ONLINE_CONCURRENCY_INSUFFICIENT: '现在在线能做的人不够',
+  AVAILABLE_CONCURRENCY_INSUFFICIENT: '现在空闲能做的人不够',
+  NO_VALID_PERFORMANCE_CERTIFICATION: '还没有这类任务的能力记录',
+  P95_EXCEEDS_UNIT_LIMIT: '按以往速度，单条可能超时',
+  DEADLINE_ALREADY_PASSED: '截止时间已经过了',
+  DEADLINE_NOT_FEASIBLE: '按现在的速度，可能赶不及截止',
 };
 
 export function capacityReason(reason: string): string {

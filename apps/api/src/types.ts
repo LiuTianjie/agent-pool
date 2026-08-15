@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { JWT } from '@fastify/jwt';
 
 import type { AppConfig } from './config.js';
+import type { DatasetFetch } from './dataset-index.js';
 import type { DbPool } from './db.js';
 import type { ControlScope, RunnerOperatorType } from '@agent-pool/shared';
 
@@ -37,6 +38,7 @@ declare module 'fastify' {
     config: AppConfig;
     db: DbPool;
     jwt: JWT;
+    datasetFetch: DatasetFetch;
   }
 
   interface FastifyRequest {

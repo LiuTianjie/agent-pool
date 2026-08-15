@@ -164,13 +164,11 @@ export function DeviceApprovalPage() {
             <h1>{approvalResult.kind === 'control' ? '控制 Agent 已连接' : '设备已连接'}</h1>
             {approvalResult.kind === 'control' ? (
               <p>
-                {approvalResult.label} 只获得刚才列出的平台能力，不会得到你的网页登录密码、Runner
-                凭证或模型账户。你可以随时在账户设置中撤销它。
+                {approvalResult.label} 只能做刚才列出的事。之后可以在设置里关掉。
               </p>
             ) : (
               <p>
-                {approvalResult.label} 已获批准。可以回到终端。Runner
-                将获得独立的平台凭证，但不会获得你的网页密码，也不会把模型凭证上传到平台。
+                {approvalResult.label} 已连上。可以回到终端继续。
               </p>
             )}
             <Link
@@ -196,11 +194,11 @@ export function DeviceApprovalPage() {
           </div>
         ) : (
           <>
-            <h1>{isControl ? '让 Agent 操作你的平台账户' : '连接一台 Runner'}</h1>
+            <h1>{isControl ? '让程序代你操作' : '连上这台机器'}</h1>
             <p>
               {isControl
-                ? '这是一次账户授权。先逐项核对 Agent 请求的能力与有效期；未列出的操作不会被放行。'
-                : '输入终端显示的一次性设备码。确认前请核对设备名称；批准只连接 Runner，不会授权模型账户。'}
+                ? '先看它要做什么。没列出的，它做不了。'
+                : '输入终端里的设备码。批准只连上这台机器，不会交出模型登录。'}
             </p>
             <form className="device-code-form" onSubmit={submitCode}>
               <label>
@@ -349,8 +347,8 @@ export function DeviceApprovalPage() {
                             : '权限被限制在上方清单内。'}
                         </strong>
                         {highRiskScopes.length > 0
-                          ? ' 这个 Agent 可以代表你改变平台状态。只批准你刚刚亲自启动、并且信任其指令来源的 Agent。'
-                          : ' 它不能领取 Runner 任务、读取模型登录，也不能获得未请求的平台能力。'}
+                          ? ' 它可以改你的账户。只批准你刚刚自己打开、并且信得过的那个。'
+                          : ' 它只能做上面列出的事，拿不到模型登录。'}
                       </p>
                     </div>
                     {highRiskScopes.length > 0 ? (
@@ -394,9 +392,8 @@ export function DeviceApprovalPage() {
                     <div className="device-safety device-safety-official">
                       <AlertTriangle aria-hidden="true" />
                       <p>
-                        <strong>这是平台 Official Fleet 权限，不是普通 Runner。</strong>
-                        批准后，这个客户端可以代表官方 Fleet
-                        手动领取任务，收益进入已绑定的官方账户。只批准你刚刚亲自启动的官方客户端。
+                        <strong>这是官方节点。</strong>
+                        批准后它可以代官方账户领任务。只批准你刚刚自己打开的那个。
                       </p>
                     </div>
                     <label className="device-official-confirm">
@@ -413,7 +410,7 @@ export function DeviceApprovalPage() {
                       disabled={approving || !riskConfirmed}
                       onClick={() => void approve()}
                     >
-                      {approving ? '正在连接…' : '授予 Official Fleet 凭证'}
+                      {approving ? '正在连接…' : '批准官方节点'}
                     </button>
                   </>
                 ) : (
@@ -421,9 +418,8 @@ export function DeviceApprovalPage() {
                     <div className="device-safety">
                       <ShieldCheck aria-hidden="true" />
                       <p>
-                        <strong>这是普通 Community Runner。</strong>
-                        批准只签发平台 Runner 凭证；任务仍需主人在 CLI
-                        或网页中手动领取，不会自动接单，也不会获得模型账户凭证。
+                        <strong>这是普通机器。</strong>
+                        批准后只连上它。要做任务，还得再运行领取命令。
                       </p>
                     </div>
                     <button
@@ -432,7 +428,7 @@ export function DeviceApprovalPage() {
                       disabled={approving}
                       onClick={() => void approve()}
                     >
-                      {approving ? '正在连接…' : '批准这台 Community Runner'}
+                      {approving ? '正在连接…' : '批准这台机器'}
                     </button>
                   </>
                 )}

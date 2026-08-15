@@ -1,16 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
   acceptanceChecks,
+  attachPublishDataset,
   callbackExample,
   compileAgentInstruction,
   expectedOutputCoverage,
   generateReceiptSecret,
+  inlineUnitLimitMessage,
+  isHttpsDatasetUrl,
   isHttpsWebhook,
   parseConstraints,
   parseJsonObject,
   receiptExample,
+  resolvePublishUnitCount,
   unitReferenceIssues,
 } from './taskContract';
+import { INLINE_UNIT_MAX } from '@agent-pool/shared';
 
 describe('task capsule contract helpers', () => {
   it('turns multiline constraints into stable chips', () => {
@@ -41,7 +46,7 @@ describe('task capsule contract helpers', () => {
   it('finds missing and duplicate external reference IDs', () => {
     expect(
       unitReferenceIssues([{ label: 'same', input: 1 }, { label: 'same', input: 2 }, { input: 3 }]),
-    ).toEqual(['1 个 Unit 缺少外部引用 ID', '外部引用 ID 重复：same']);
+    ).toEqual(['1 条任务缺少外部引用 ID', '外部引用 ID 重复：same']);
   });
 
   it('renders protocol-accurate webhook examples with a redacted signature', () => {
@@ -53,6 +58,95 @@ describe('task capsule contract helpers', () => {
     });
     expect(receipt.protocol).toBe('agentpool-receipt/1');
     expect(receipt.signature).toBe('[REDACTED]');
+  });
+
+  it('keeps the inline unit cap out of publisher-facing copy', () => {
+    expect(inlineUnitLimitMessage()).not.toMatch(/20[,.]?000|20000/);
+    expect(INLINE_UNIT_MAX).toBe(20_000);
+  });
+
+  it('accepts HTTPS dataset URLs and rejects other schemes', () => {
+    expect(isHttpsDatasetUrl('https://files.example.com/batch.jsonl')).toBe(true);
+    expect(isHttpsDatasetUrl('http://files.example.com/batch.jsonl')).toBe(false);
+  });
+
+  it('omits inline units when publishing an HTTPS dataset', () => {
+    const payload = attachPublishDataset(
+      {
+        title: 'Batch',
+        category: 'data',
+        publicSummary: 'Remote JSONL stays with the publisher',
+        requestedAgent: 'codex',
+        requestedModel: 'gpt-5.4',
+        requiredConcurrency: 2,
+        maxUnitSeconds: 60,
+        deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+        rewardPerUnit: 4,
+        validationMode: 'auto',
+        taskCapsule: {
+          version: 'ap-task/1',
+          goal: 'Answer each row',
+          inputDescription: 'One JSON object per line',
+          outputDescription: 'Any non-empty result',
+          constraints: [],
+          examples: [{ input: { q: 1 }, output: 'ok' }],
+          delivery: { format: 'text', maxBytes: 1024 },
+          acceptance: { mode: 'non_empty', criteria: ['non-empty'] },
+        },
+        deliveryTarget: { mode: 'platform' },
+        launchMode: 'pilot',
+        pilotUnits: 2,
+      },
+      { mode: 'https', url: 'https://files.example.com/batch.jsonl' },
+      [{ input: 'should-not-be-sent' }],
+    );
+    expect(payload.dataset).toEqual({
+      mode: 'https',
+      url: 'https://files.example.com/batch.jsonl',
+    });
+    expect(payload.units).toBeUndefined();
+  });
+
+  it('keeps inline units when the dataset stays on the platform', () => {
+    const units = [{ input: 'a' }, { input: 'b' }];
+    const payload = attachPublishDataset(
+      {
+        title: 'Pasted',
+        category: 'text',
+        publicSummary: 'Pasted rows are stored inline',
+        requestedAgent: 'codex',
+        requestedModel: 'gpt-5.4',
+        requiredConcurrency: 1,
+        maxUnitSeconds: 60,
+        deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+        rewardPerUnit: 4,
+        validationMode: 'auto',
+        taskCapsule: {
+          version: 'ap-task/1',
+          goal: 'Answer each row',
+          inputDescription: 'One line per task',
+          outputDescription: 'Any non-empty result',
+          constraints: [],
+          examples: [{ input: 'a', output: 'ok' }],
+          delivery: { format: 'text', maxBytes: 1024 },
+          acceptance: { mode: 'non_empty', criteria: ['non-empty'] },
+        },
+        deliveryTarget: { mode: 'platform' },
+        launchMode: 'pilot',
+        pilotUnits: 2,
+      },
+      { mode: 'inline' },
+      units,
+    );
+    expect(payload.dataset).toEqual({ mode: 'inline' });
+    expect(payload.units).toEqual(units);
+  });
+
+  it('uses the remote count for HTTPS datasets and local rows for paste', () => {
+    expect(
+      resolvePublishUnitCount({ mode: 'https', url: 'https://files.example.com/a.jsonl' }, [], 128),
+    ).toBe(128);
+    expect(resolvePublishUnitCount({ mode: 'inline' }, [{ input: 1 }, { input: 2 }], 128)).toBe(2);
   });
 
   it('previews the same delimited task-capsule protocol used by the runner', () => {

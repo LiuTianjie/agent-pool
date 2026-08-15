@@ -22,12 +22,12 @@ import type { LedgerEntry } from '../lib/types';
 const TOP_UP_OPTIONS = [1_000, 5_000, 20_000, 100_000];
 
 const ENTRY_LABEL: Record<LedgerEntry['kind'], string> = {
-  topup: '开发 PULSE 增加',
+  topup: '增加积分',
   lock: '发布任务锁定',
-  unlock: '未执行 PULSE 解锁',
+  unlock: '未执行积分解锁',
   earning_pending: '交付待结算',
   earning_settled: '收益已结算',
-  withdrawal: '开发态模拟提现',
+  withdrawal: '提现',
   adjustment: '账本调整',
 };
 
@@ -59,7 +59,7 @@ export function WalletPage() {
       setEntries(normalizeList(ledgerResult));
       setError(null);
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : '无法读取 PULSE 账本');
+      setError(requestError instanceof ApiError ? requestError.message : '无法读取积分');
     } finally {
       setLoading(false);
     }
@@ -71,7 +71,7 @@ export function WalletPage() {
 
   const topUp = async () => {
     if (topUpAmount < 1 || topUpAmount > 1_000_000) {
-      setError('演示 PULSE 增加范围为 1–1,000,000 PULSE（非真实法币）');
+      setError('一次可以增加 1–1,000,000 积分');
       return;
     }
     setToppingUp(true);
@@ -82,7 +82,7 @@ export function WalletPage() {
       const ledgerResult = await api.ledger();
       setEntries(normalizeList(ledgerResult));
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : '增加 PULSE 失败');
+      setError(requestError instanceof ApiError ? requestError.message : '增加积分失败');
     } finally {
       setToppingUp(false);
     }
@@ -99,7 +99,7 @@ export function WalletPage() {
     try {
       const result = await api.devWithdraw(Math.trunc(withdrawAmount));
       setWallet(result.wallet);
-      setWithdrawalNotice(`模拟提现已标记为 ${result.status}，未产生真实法币。`);
+      setWithdrawalNotice('已记下一笔提现，没有真实打款。');
       setWithdrawOpen(false);
       setEntries(normalizeList(await api.ledger()));
     } catch (requestError) {
@@ -109,16 +109,16 @@ export function WalletPage() {
     }
   };
 
-  if (loading && !wallet) return <LoadingState label="正在核对 PULSE 账本" />;
+  if (loading && !wallet) return <LoadingState label="正在读取积分" />;
   if (error && !wallet) return <InlineError message={error} retry={() => void load()} />;
   if (!wallet) return null;
 
   return (
     <div className="page wallet-page">
       <PageHeader
-        eyebrow="LEDGER / PREPAID CREDITS"
-        title="PULSE 账本"
-        description="PULSE 是演示积分 / 非真实法币。增加的 PULSE 只能发布任务，Agent 赚得的 PULSE 单独进入收益。"
+        eyebrow="积分"
+        title="积分"
+        description="发布任务用可消费积分，做完任务赚到的进收益。现在还不是真钱。"
         actions={
           <>
             <button
@@ -130,14 +130,14 @@ export function WalletPage() {
                 setWithdrawOpen(true);
               }}
             >
-              <ArrowUpFromLine aria-hidden="true" /> 模拟提现
+              <ArrowUpFromLine aria-hidden="true" /> 提现
             </button>
             <button
               className="button button-primary"
               type="button"
               onClick={() => setTopUpOpen(true)}
             >
-              <Plus aria-hidden="true" /> 增加演示 PULSE
+              <Plus aria-hidden="true" /> 增加积分
             </button>
           </>
         }
@@ -156,8 +156,8 @@ export function WalletPage() {
             <ArrowDownLeft aria-hidden="true" />
           </span>
           <div>
-            <h2>增加的 PULSE</h2>
-            <p>只能用于锁定任务预算；不能转给其他账户，也不能提现。</p>
+            <h2>增加的积分</h2>
+            <p>用来发布任务，不能转给别人，也不能提现。</p>
           </div>
         </article>
         <span className="boundary-divider">
@@ -168,8 +168,8 @@ export function WalletPage() {
             <ArrowUpRight aria-hidden="true" />
           </span>
           <div>
-            <h2>赚来的 PULSE</h2>
-            <p>交付通过后先进入待结算，之后进入可模拟提现收益；全程不产生真实法币。</p>
+            <h2>赚来的积分</h2>
+            <p>任务通过后先待结算，再进入可提现。</p>
           </div>
         </article>
       </section>
@@ -182,7 +182,7 @@ export function WalletPage() {
           <span>{entries.length} 笔</span>
         </div>
         {entries.length ? (
-          <div className="ledger-table" role="table" aria-label="PULSE 流水，演示积分，非真实法币">
+          <div className="ledger-table" role="table" aria-label="积分流水">
             <div className="ledger-head" role="row">
               <span>类型</span>
               <span>说明</span>
@@ -211,7 +211,7 @@ export function WalletPage() {
         ) : (
           <EmptyState
             title="账本还是空的"
-            detail="增加演示 PULSE 或完成第一个 Unit 后，所有 PULSE 流动都会记录在这里。"
+            detail="增加积分或做完第一条任务后，流水会出现在这里。"
           />
         )}
       </section>
@@ -219,9 +219,7 @@ export function WalletPage() {
       <aside className="dev-money-note">
         <Info aria-hidden="true" />
         <p>
-          <strong>开发阶段说明</strong> PULSE 是演示积分 /
-          非真实法币。当前增加不会发起真实扣款，模拟提现只写入 simulated_paid 账本记录；Purchased 与
-          Earned 始终保持独立。
+          <strong>现在还不是真钱。</strong>增加和提现都只记账，充值和收益分开算。
         </p>
       </aside>
 
@@ -240,8 +238,8 @@ export function WalletPage() {
             <div className="dialog-icon dialog-icon-lime">
               <WalletCards aria-hidden="true" />
             </div>
-            <h2 id="topup-title">增加演示 PULSE</h2>
-            <p>PULSE 是演示积分 / 非真实法币。这不会产生真实支付，余额只能用于发布任务。</p>
+            <h2 id="topup-title">增加积分</h2>
+            <p>现在只是记账，这些积分只能用来发布任务。</p>
             <div className="topup-options">
               {TOP_UP_OPTIONS.map((amount) => (
                 <button
@@ -269,7 +267,7 @@ export function WalletPage() {
             </label>
             <div className="topup-assurance">
               <ShieldCheck aria-hidden="true" />
-              <span>服务端账本会记录本次增加；增加获得的 PULSE 不能提现。</span>
+              <span>加进来的积分不能提现。</span>
             </div>
             <div className="dialog-actions">
               <button
@@ -307,11 +305,8 @@ export function WalletPage() {
             <div className="dialog-icon dialog-icon-lime">
               <ArrowUpFromLine aria-hidden="true" />
             </div>
-            <h2 id="withdraw-title">模拟提现收益</h2>
-            <p>
-              只会扣减 Earned Available 并写入一笔 <code>simulated_paid</code>{' '}
-              记录，不产生真实银行卡、钱包或法币付款。
-            </p>
+            <h2 id="withdraw-title">提现收益</h2>
+            <p>现在只从可提现收益里扣一笔账，不会打到银行卡。</p>
             <label className="field">
               <span>从可提现收益扣减</span>
               <span className="input-shell">
@@ -325,13 +320,12 @@ export function WalletPage() {
                 />
               </span>
               <small>
-                当前最多 {credits(wallet.earnedAvailable)}；增加获得的 PULSE 永远不可提现。演示积分
-                / 非真实法币。
+                当前最多 {credits(wallet.earnedAvailable)}。用来发布的积分不能提现。
               </small>
             </label>
             <div className="topup-assurance">
               <ShieldCheck aria-hidden="true" />
-              <span>开发态闭环：服务端返回 simulated_paid，仅用于验证赚取 → 提现的账本流程。</span>
+              <span>这是演示提现，用来看账怎么走。</span>
             </div>
             <div className="dialog-actions">
               <button
@@ -349,7 +343,7 @@ export function WalletPage() {
                 }
                 onClick={() => void withdraw()}
               >
-                {withdrawing ? '正在处理…' : `模拟提现 ${credits(withdrawAmount)}`}
+                {withdrawing ? '正在处理…' : `提现 ${credits(withdrawAmount)}`}
               </button>
             </div>
           </section>

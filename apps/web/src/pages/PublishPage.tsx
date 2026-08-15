@@ -1,19 +1,19 @@
 import type {
   CapacityQuote,
+  DatasetSource,
   RequestedAgent,
   TaskCategory,
   WalletSummary,
 } from '@agent-pool/shared';
+import { DATASET_UNIT_MAX, INLINE_UNIT_MAX, formatCredits } from '@agent-pool/shared';
 import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Bot,
-  Boxes,
   Check,
   CheckCircle2,
   ChevronDown,
-  CircleDot,
   Clock3,
   Code2,
   Copy,
@@ -26,7 +26,6 @@ import {
   Layers3,
   LockKeyhole,
   Plus,
-  RadioTower,
   RefreshCw,
   Rocket,
   ShieldCheck,
@@ -44,18 +43,23 @@ import { InlineError, LoadingState } from '../components/LoadingState';
 import { NumberDraftInput } from '../components/NumberDraftInput';
 import { PageHeader } from '../components/PageHeader';
 import { api, ApiError } from '../lib/api';
-import { capacityReason, credits, duration, fullDateTime } from '../lib/format';
+import { capacityReason, duration, fullDateTime } from '../lib/format';
 import {
   acceptanceChecks,
+  attachPublishDataset,
+  buildTaskCapsule,
   callbackExample,
   compileAgentInstruction,
   expectedOutputCoverage,
   generateReceiptSecret,
+  inlineUnitLimitMessage,
+  isHttpsDatasetUrl,
   isHttpsWebhook,
   parseConstraints,
   parseExampleOutput,
   parseJsonObject,
   receiptExample,
+  resolvePublishUnitCount,
   unitReferenceIssues,
   webhookHostname,
   type AcceptanceMode,
@@ -73,106 +77,47 @@ import { lockedBudget, parseUnits, printableValue, type UnitParseMode } from '..
 const CATEGORIES: Array<{
   value: TaskCategory;
   label: string;
-  detail: string;
 }> = [
-  { value: 'text', label: '文本', detail: '理解 · 生成' },
-  { value: 'data', label: '数据', detail: '清洗 · 标注' },
-  { value: 'coding', label: '代码', detail: '实现 · 审查' },
-  { value: 'research', label: '研究', detail: '搜索 · 归纳' },
-  { value: 'math', label: '数学', detail: '计算 · 证明' },
-  { value: 'vision', label: '视觉', detail: '识别 · 观察' },
-  { value: 'other', label: '其他', detail: '自定义任务' },
+  { value: 'text', label: '文本' },
+  { value: 'data', label: '数据' },
+  { value: 'coding', label: '代码' },
+  { value: 'research', label: '研究' },
+  { value: 'math', label: '数学' },
+  { value: 'vision', label: '视觉' },
+  { value: 'other', label: '其他' },
 ];
-
-function CategoryGlyph({ category }: { category: TaskCategory }) {
-  const glyph = (() => {
-    switch (category) {
-      case 'text':
-        return (
-          <>
-            <path d="M11 14h26M11 21h18M11 28h24M11 35h13" />
-            <path className="glyph-core" d="M33 19v11l5-3v-5z" />
-          </>
-        );
-      case 'data':
-        return (
-          <>
-            <ellipse cx="24" cy="13" rx="13" ry="5" />
-            <path d="M11 13v10c0 2.8 5.8 5 13 5s13-2.2 13-5V13M11 23v10c0 2.8 5.8 5 13 5s13-2.2 13-5V23" />
-            <path className="glyph-core" d="M30 20h4" />
-          </>
-        );
-      case 'coding':
-        return (
-          <>
-            <path d="m18 14-9 10 9 10M30 14l9 10-9 10" />
-            <path className="glyph-core" d="m27 10-6 28" />
-          </>
-        );
-      case 'research':
-        return (
-          <>
-            <circle cx="21" cy="21" r="9" />
-            <path d="m28 28 9 9M21 8V5M8 21H5M12 12 9 9" />
-            <path className="glyph-core" d="M17 21h8M21 17v8" />
-          </>
-        );
-      case 'math':
-        return (
-          <>
-            <path d="M35 10H14l11 14-11 14h21" />
-            <path className="glyph-core" d="M30 18h9M34.5 13.5v9" />
-          </>
-        );
-      case 'vision':
-        return (
-          <>
-            <path d="M5 24s7-11 19-11 19 11 19 11-7 11-19 11S5 24 5 24Z" />
-            <circle className="glyph-core" cx="24" cy="24" r="6" />
-            <path d="M24 8V4M24 44v-4M8 24H4M44 24h-4" />
-          </>
-        );
-      default:
-        return (
-          <>
-            <path d="m24 7 5 7 9 1-4 8 4 8-9 1-5 9-5-9-9-1 4-8-4-8 9-1z" />
-            <circle className="glyph-core" cx="24" cy="23" r="4" />
-          </>
-        );
-    }
-  })();
-
-  return (
-    <svg aria-hidden="true" focusable="false" viewBox="0 0 48 48">
-      <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-        {glyph}
-      </g>
-    </svg>
-  );
-}
 
 const STEPS = [
   { id: 1, label: '任务说明' },
-  { id: 2, label: '任务数据' },
-  { id: 3, label: '执行与预算' },
+  { id: 2, label: '数据在哪' },
+  { id: 3, label: '预算与试跑' },
   { id: 4, label: '检查并发布' },
 ] as const;
 
-const ACCEPTANCE_OPTIONS: Array<{
-  value: Exclude<AcceptanceMode, 'webhook'>;
+const DEFAULT_ACCEPTANCE_OPTIONS: Array<{
+  value: Extract<AcceptanceMode, 'non_empty' | 'hidden_exact' | 'manual'>;
   label: string;
   detail: string;
 }> = [
   { value: 'non_empty', label: '结果非空', detail: '只确认有内容，不判断正确性' },
-  { value: 'schema', label: 'JSON Schema', detail: '检查形状、类型和必填字段' },
   { value: 'hidden_exact', label: '与预设答案一致', detail: '每条任务都要提供预设答案' },
+  { value: 'manual', label: '人工确认', detail: '由你查看结果后决定是否完成' },
+];
+
+const ADVANCED_ACCEPTANCE_OPTIONS: Array<{
+  value: Extract<AcceptanceMode, 'schema' | 'schema_and_hidden_exact'>;
+  label: string;
+  detail: string;
+}> = [
+  { value: 'schema', label: 'JSON Schema', detail: '检查形状、类型和必填字段' },
   {
     value: 'schema_and_hidden_exact',
     label: 'Schema + 预设答案',
     detail: '格式和答案都符合才算完成',
   },
-  { value: 'manual', label: '人工确认', detail: '由你查看结果后决定是否完成' },
 ];
+
+const ACCEPTANCE_OPTIONS = [...DEFAULT_ACCEPTANCE_OPTIONS, ...ADVANCED_ACCEPTANCE_OPTIONS];
 
 const EMPTY_EXAMPLE: TaskExampleDraft = { input: '', output: '', note: '' };
 
@@ -197,6 +142,17 @@ function plainCheckText(value: string): string {
     .replaceAll('验收', '确认');
 }
 
+function points(value: number): string {
+  return `${formatCredits(value)} 积分`;
+}
+
+function deadlineIso(value: string): string {
+  const time = new Date(value).getTime();
+  return Number.isFinite(time)
+    ? new Date(time).toISOString()
+    : new Date(Date.now() + 86_400_000).toISOString();
+}
+
 export function PublishPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -209,6 +165,12 @@ export function PublishPage() {
   const [examples, setExamples] = useState<TaskExampleDraft[]>([{ ...EMPTY_EXAMPLE }]);
   const [expandedExample, setExpandedExample] = useState<number | null>(0);
 
+  const [datasetMode, setDatasetMode] = useState<DatasetSource['mode']>('https');
+  const [datasetUrl, setDatasetUrl] = useState('');
+  const [datasetCheckedUrl, setDatasetCheckedUrl] = useState('');
+  const [datasetHost, setDatasetHost] = useState<string | null>(null);
+  const [remoteUnitCount, setRemoteUnitCount] = useState(0);
+  const [checkingDataset, setCheckingDataset] = useState(false);
   const [rawUnits, setRawUnits] = useState('');
   const [parseMode, setParseMode] = useState<UnitParseMode>('lines');
   const [units, setUnits] = useState<TaskUnitDraft[]>([]);
@@ -262,8 +224,30 @@ export function PublishPage() {
 
   const constraints = useMemo(() => parseConstraints(constraintsRaw), [constraintsRaw]);
   const schemaState = useMemo(() => parseJsonObject(schemaText), [schemaText]);
-  const coverage = useMemo(() => expectedOutputCoverage(units), [units]);
-  const references = useMemo(() => unitReferenceIssues(units), [units]);
+  const dataset: DatasetSource =
+    datasetMode === 'https'
+      ? { mode: 'https', url: datasetUrl.trim() }
+      : { mode: 'inline' };
+  const httpsReady =
+    datasetMode === 'https' &&
+    datasetCheckedUrl === datasetUrl.trim() &&
+    remoteUnitCount >= 2 &&
+    remoteUnitCount <= DATASET_UNIT_MAX;
+  const unitCount = resolvePublishUnitCount(dataset, units, remoteUnitCount);
+  const coverage = useMemo(() => {
+    if (datasetMode === 'https') {
+      return {
+        covered: httpsReady ? remoteUnitCount : 0,
+        total: remoteUnitCount,
+        percent: httpsReady ? 100 : 0,
+      };
+    }
+    return expectedOutputCoverage(units);
+  }, [datasetMode, httpsReady, remoteUnitCount, units]);
+  const references = useMemo(
+    () => (datasetMode === 'https' ? [] : unitReferenceIssues(units)),
+    [datasetMode, units],
+  );
   const currentModels = useMemo(
     () => catalog.find((entry) => entry.adapter === requestedAgent)?.models || [],
     [catalog, requestedAgent],
@@ -298,25 +282,23 @@ export function PublishPage() {
     ],
   );
 
-  const budget = lockedBudget(units.length, rewardPerUnit);
-  const heldUnits = launchMode === 'pilot' ? Math.max(0, units.length - pilotUnits) : 0;
+  const budget = lockedBudget(unitCount, rewardPerUnit);
+  const heldUnits = launchMode === 'pilot' ? Math.max(0, unitCount - pilotUnits) : 0;
   const capacityInput = useMemo(
     () => ({
       adapter: requestedAgent,
       model: requestedModel.trim(),
       deliveryMode: deliveryTarget,
-      unitCount: units.length,
+      unitCount,
       requiredConcurrency,
       maxUnitSeconds,
-      deadlineAt: Number.isNaN(new Date(deadlineAt).getTime())
-        ? ''
-        : new Date(deadlineAt).toISOString(),
+      deadlineAt: deadlineIso(deadlineAt),
     }),
     [
       requestedAgent,
       requestedModel,
       deliveryTarget,
-      units.length,
+      unitCount,
       requiredConcurrency,
       maxUnitSeconds,
       deadlineAt,
@@ -324,6 +306,88 @@ export function PublishPage() {
   );
   const currentFingerprint = JSON.stringify(capacityInput);
   const quoteIsCurrent = quote !== null && quoteFingerprint === currentFingerprint;
+  const exactMode =
+    acceptanceMode === 'hidden_exact' || acceptanceMode === 'schema_and_hidden_exact';
+  const advancedAcceptance =
+    acceptanceMode === 'schema' || acceptanceMode === 'schema_and_hidden_exact';
+
+  const parsedExamples = () =>
+    examples
+      .filter((example) => example.input.trim() || example.output.trim())
+      .map((example) => ({
+        input: example.input,
+        output: parseExampleOutput(example.output, deliveryFormat),
+        ...(example.note.trim() ? { note: example.note.trim() } : {}),
+      }));
+
+  const buildPayload = (options?: {
+    probe?: boolean;
+    acceptanceMode?: AcceptanceMode;
+    deliveryTarget?: DeliveryMode;
+    requiredConcurrency?: number;
+  }): CreatePoolWebInput => {
+    const mode = options?.acceptanceMode ?? acceptanceMode;
+    const target = options?.deliveryTarget ?? deliveryTarget;
+    const criteria = acceptanceChecks(mode, coverage, Boolean(schemaState.value)).map(
+      (check) => `${check.label}：${check.detail}`,
+    );
+    const capsule = buildTaskCapsule({
+      goal: goal.trim(),
+      inputDescription: inputDescription.trim(),
+      outputDescription: outputDescription.trim(),
+      constraints,
+      examples: options?.probe
+        ? examples
+            .filter((example) => example.input.trim() && example.output.trim())
+            .map((example) => ({
+              input: example.input,
+              output: example.output,
+              ...(example.note.trim() ? { note: example.note.trim() } : {}),
+            }))
+        : parsedExamples(),
+      format: options?.probe ? 'text' : deliveryFormat,
+      schema: options?.probe ? undefined : schemaState.value,
+      acceptanceMode: mode,
+      criteria,
+      normalization: exactMode && !options?.probe ? answerNormalization : undefined,
+    });
+    return attachPublishDataset(
+      {
+        title: title.trim(),
+        category,
+        publicSummary: goal.trim().slice(0, 300),
+        requestedAgent,
+        requestedModel: requestedModel.trim() || currentModels[0] || 'unspecified',
+        requiredConcurrency: options?.requiredConcurrency ?? requiredConcurrency,
+        maxUnitSeconds,
+        deadlineAt: capacityInput.deadlineAt,
+        rewardPerUnit,
+        validationMode: legacyValidation(mode),
+        taskCapsule: capsule,
+        deliveryTarget:
+          target === 'webhook'
+            ? { mode: 'webhook', url: webhookUrl.trim(), receiptSecret }
+            : { mode: 'platform' },
+        launchMode,
+        pilotUnits: launchMode === 'pilot' ? pilotUnits : Math.min(3, Math.max(1, unitCount)),
+      },
+      dataset,
+      units,
+    );
+  };
+
+  const applyRemoteCount = (totalUnits: number, url: string, host: string | null) => {
+    if (totalUnits > DATASET_UNIT_MAX) {
+      throw new Error('远程文件条数超出平台上限');
+    }
+    setRemoteUnitCount(totalUnits);
+    setDatasetCheckedUrl(url);
+    setDatasetHost(host);
+    setRequiredConcurrency((current) => Math.min(Math.max(1, current), totalUnits));
+    setPilotUnits((current) => Math.min(Math.max(1, current || 3), Math.min(3, totalUnits)));
+    setParseError(null);
+    setQuote(null);
+  };
 
   const updateExample = (index: number, key: keyof TaskExampleDraft, value: string) => {
     setExamples((current) =>
@@ -354,11 +418,18 @@ export function PublishPage() {
     setQuote(null);
   };
 
+  const selectDatasetMode = (mode: DatasetSource['mode']) => {
+    setDatasetMode(mode);
+    setParseError(null);
+    setError(null);
+    setQuote(null);
+  };
+
   const parseCurrentUnits = (): TaskUnitDraft[] | null => {
     try {
       const parsed = parseUnits(rawUnits, parseMode);
       if (parsed.length < 2) throw new Error('至少需要 2 条独立任务数据');
-      if (parsed.length > 20_000) throw new Error('一次最多发布 20,000 条任务');
+      if (parsed.length > INLINE_UNIT_MAX) throw new Error(inlineUnitLimitMessage());
       setUnits(parsed);
       setRequiredConcurrency((current) => Math.min(Math.max(1, current), parsed.length));
       setPilotUnits((current) => Math.min(Math.max(1, current || 3), Math.min(3, parsed.length)));
@@ -386,7 +457,7 @@ export function PublishPage() {
     try {
       const parsed = parseUnits(text, mode);
       if (parsed.length < 2) throw new Error('至少需要 2 条独立任务数据');
-      if (parsed.length > 20_000) throw new Error('一次最多发布 20,000 条任务');
+      if (parsed.length > INLINE_UNIT_MAX) throw new Error(inlineUnitLimitMessage());
       setUnits(parsed);
       setRequiredConcurrency((current) => Math.min(Math.max(1, current), parsed.length));
       setPilotUnits(Math.min(3, parsed.length));
@@ -404,6 +475,11 @@ export function PublishPage() {
     setAcceptanceMode(target === 'webhook' ? 'webhook' : 'non_empty');
   };
 
+  const selectAcceptance = (mode: AcceptanceMode) => {
+    if (mode !== 'webhook') setDeliveryTarget('platform');
+    setAcceptanceMode(mode);
+  };
+
   const setFormat = (format: DeliveryFormat) => {
     setDeliveryFormat(format);
     if (
@@ -419,7 +495,7 @@ export function PublishPage() {
     try {
       await navigator.clipboard.writeText(receiptSecret);
       setSecretCopied(true);
-      setCopyNotice('已复制一次。请现在写入你的回执服务；平台保存后不会回显。');
+      setCopyNotice('已复制。关掉后看不到。');
     } catch {
       setCopyNotice('浏览器拒绝复制，请重试或重新生成。');
     }
@@ -436,7 +512,67 @@ export function PublishPage() {
     return false;
   };
 
-  const validateStep = (): boolean => {
+  const checkHttpsDataset = async (): Promise<number | null> => {
+    if (!isHttpsDatasetUrl(datasetUrl)) {
+      setParseError('请填写有效的 HTTPS JSONL 地址');
+      return null;
+    }
+    setCheckingDataset(true);
+    setError(null);
+    setParseError(null);
+    try {
+      const result = await api.validatePool(
+        buildPayload({
+          probe: true,
+          acceptanceMode: 'non_empty',
+          deliveryTarget: 'platform',
+          requiredConcurrency: 1,
+        }),
+      );
+      applyRemoteCount(
+        result.totalUnits,
+        datasetUrl.trim(),
+        result.dataset.mode === 'https' ? result.dataset.host : null,
+      );
+      return result.totalUnits;
+    } catch (requestError) {
+      setRemoteUnitCount(0);
+      setDatasetCheckedUrl('');
+      setDatasetHost(null);
+      const message =
+        requestError instanceof ApiError ? requestError.message : '无法检查这个地址';
+      setParseError(message);
+      return null;
+    } finally {
+      setCheckingDataset(false);
+    }
+  };
+
+  const confirmRemoteAcceptance = async (knownCount: number): Promise<boolean> => {
+    setCheckingDataset(true);
+    setError(null);
+    try {
+      const result = await api.validatePool(
+        buildPayload({
+          requiredConcurrency: Math.min(Math.max(1, requiredConcurrency), Math.max(1, knownCount)),
+        }),
+      );
+      applyRemoteCount(
+        result.totalUnits,
+        datasetUrl.trim(),
+        result.dataset.mode === 'https' ? result.dataset.host : null,
+      );
+      return true;
+    } catch (requestError) {
+      return voidError(
+        requestError instanceof ApiError ? requestError.message : '远程文件还不能按当前完成规则发布',
+      );
+    } finally {
+      setCheckingDataset(false);
+    }
+  };
+
+  const validateStep = (options?: { httpsReady?: boolean }): boolean => {
     setError(null);
     if (step === 1) {
       if (title.trim().length < 3) return voidError('任务名称至少 3 个字');
@@ -447,8 +583,15 @@ export function PublishPage() {
         return voidError('至少提供 1 组完整的示例输入与输出');
     }
     if (step === 2) {
-      const parsed = parseCurrentUnits();
-      if (!parsed) return false;
+      let parsed = units;
+      if (datasetMode === 'https') {
+        if (!isHttpsDatasetUrl(datasetUrl)) return voidError('请填写有效的 HTTPS JSONL 地址');
+        if (!(options?.httpsReady ?? httpsReady)) return voidError('请先检查地址，确认文件条数');
+      } else {
+        const nextUnits = parseCurrentUnits();
+        if (!nextUnits) return false;
+        parsed = nextUnits;
+      }
       if (deliveryFormat === 'json') {
         for (const [index, example] of examples.entries()) {
           if (!example.output.trim()) continue;
@@ -459,48 +602,67 @@ export function PublishPage() {
           }
         }
       }
-      const parsedCoverage = expectedOutputCoverage(parsed);
+      const parsedCoverage =
+        datasetMode === 'https' ? coverage : expectedOutputCoverage(parsed);
       if (acceptanceMode === 'schema' || acceptanceMode === 'schema_and_hidden_exact') {
         if (deliveryFormat !== 'json') return voidError('Schema 检查要求结果格式为 JSON');
         if (!schemaText.trim()) return voidError('这种完成规则需要填写 JSON Schema');
         if (schemaState.error || !schemaState.value)
           return voidError(`JSON Schema 尚未就绪：${schemaState.error || '请填写对象'}`);
       }
-      if (acceptanceMode === 'hidden_exact' || acceptanceMode === 'schema_and_hidden_exact') {
+      if (exactMode && datasetMode === 'inline') {
         if (parsedCoverage.covered !== parsedCoverage.total)
           return voidError(
             `与预设答案比对需要覆盖全部任务，目前 ${parsedCoverage.covered}/${parsedCoverage.total}`,
           );
       }
       if (deliveryTarget === 'webhook') {
-        if (!isHttpsWebhook(webhookUrl)) return voidError('Webhook 必须是有效的 HTTPS URL');
-        const issues = unitReferenceIssues(parsed);
-        if (issues.length) return voidError(issues.join('；').replaceAll('Unit', '任务'));
-        if (!secretCopied) return voidError('请先一次性复制 receipt secret，再继续发布');
+        if (!isHttpsWebhook(webhookUrl)) return voidError('接收地址必须是有效的 HTTPS');
+        if (datasetMode === 'inline') {
+          const issues = unitReferenceIssues(parsed);
+          if (issues.length) return voidError(issues.join('；').replaceAll('Unit', '任务'));
+        }
+        if (!secretCopied) return voidError('请先复制一次确认密钥');
       }
     }
     if (step === 3) {
-      if (!requestedModel.trim()) return voidError('必须手输或选择精确模型，平台不会自动替换');
-      if (!units.length) return voidError('请先添加任务数据');
-      if (requiredConcurrency < 1 || requiredConcurrency > units.length)
+      if (!requestedModel.trim()) return voidError('请填写模型名称');
+      if (!unitCount) return voidError('请先确认任务数据');
+      if (requiredConcurrency < 1 || requiredConcurrency > unitCount)
         return voidError('同时执行上限必须在 1 到任务条数之间');
       if (maxUnitSeconds < 10 || maxUnitSeconds > 3600)
         return voidError('每条任务时限必须在 10–3600 秒之间');
       if (rewardPerUnit < 1 || rewardPerUnit > 1_000_000)
-        return voidError('每条任务奖励必须在 1–1,000,000 PULSE 之间');
-      if (launchMode === 'pilot' && (pilotUnits < 1 || pilotUnits > Math.min(3, units.length)))
+        return voidError('每条任务奖励必须在 1–1,000,000 积分之间');
+      if (launchMode === 'pilot' && (pilotUnits < 1 || pilotUnits > Math.min(3, unitCount)))
         return voidError('试跑条数必须在 1–3 之间，且不能超过任务总数');
       const deadlineTime = new Date(deadlineAt).getTime();
       if (!Number.isFinite(deadlineTime) || deadlineTime <= Date.now() + 10_000)
         return voidError('请选择至少晚于当前时间 10 秒的截止时间');
       if (budget > (wallet?.purchasedAvailable || 0))
-        return voidError('可消费 PULSE 不足，请先去 PULSE 账本增加演示积分');
+        return voidError('积分不够，请先去积分页增加');
     }
     return true;
   };
 
   const next = async () => {
-    if (!validateStep()) return;
+    let knownHttpsReady = httpsReady;
+    let knownCount = unitCount;
+    if (step === 2 && datasetMode === 'https' && !knownHttpsReady) {
+      const checked = await checkHttpsDataset();
+      if (checked === null) return;
+      knownHttpsReady = true;
+      knownCount = checked;
+    }
+    if (!validateStep({ httpsReady: knownHttpsReady })) return;
+    if (
+      step === 2 &&
+      datasetMode === 'https' &&
+      (exactMode || deliveryTarget === 'webhook')
+    ) {
+      const confirmed = await confirmRemoteAcceptance(knownCount);
+      if (!confirmed) return;
+    }
     if (step === 3) {
       await getCapacityQuote();
       return;
@@ -531,52 +693,7 @@ export function PublishPage() {
       setStep(3);
       return;
     }
-    const parsedExamples = examples
-      .filter((example) => example.input.trim() || example.output.trim())
-      .map((example) => ({
-        input: example.input,
-        output: parseExampleOutput(example.output, deliveryFormat),
-        ...(example.note.trim() ? { note: example.note.trim() } : {}),
-      }));
-    const exactMode =
-      acceptanceMode === 'hidden_exact' || acceptanceMode === 'schema_and_hidden_exact';
-    const payload: CreatePoolWebInput = {
-      title: title.trim(),
-      category,
-      publicSummary: goal.trim().slice(0, 300),
-      requestedAgent,
-      requestedModel: requestedModel.trim(),
-      requiredConcurrency,
-      maxUnitSeconds,
-      deadlineAt: capacityInput.deadlineAt,
-      rewardPerUnit,
-      validationMode: legacyValidation(acceptanceMode),
-      units,
-      taskCapsule: {
-        version: 'ap-task/1',
-        goal: goal.trim(),
-        inputDescription: inputDescription.trim(),
-        outputDescription: outputDescription.trim(),
-        constraints,
-        examples: parsedExamples,
-        delivery: {
-          format: deliveryFormat,
-          ...(schemaState.value ? { schema: schemaState.value } : {}),
-          maxBytes: 1024 * 1024,
-        },
-        acceptance: {
-          mode: acceptanceMode,
-          criteria: checks.map((check) => `${check.label}：${check.detail}`),
-          ...(exactMode ? { normalization: answerNormalization } : {}),
-        },
-      },
-      deliveryTarget:
-        deliveryTarget === 'webhook'
-          ? { mode: 'webhook', url: webhookUrl.trim(), receiptSecret }
-          : { mode: 'platform' },
-      launchMode,
-      pilotUnits: launchMode === 'pilot' ? pilotUnits : Math.min(3, units.length),
-    };
+    const payload = buildPayload();
 
     setPublishing(true);
     setError(null);
@@ -590,14 +707,14 @@ export function PublishPage() {
     }
   };
 
-  if (loading) return <LoadingState label="正在读取当前容量" />;
+  if (loading) return <LoadingState label="正在加载" />;
 
   return (
     <div className="page publish-page capsule-publish-page">
       <PageHeader
         eyebrow="发布新任务"
-        title="把任务说清楚，再交给 Agent。"
-        description="填写每条任务会提供什么、要产出什么；先用几条试跑，确认后再开放剩余任务。"
+        title="把要做的事说清楚。"
+        description="说明目标、数据在哪、怎样算做完，再定预算和截止时间。"
       />
 
       <nav className="wizard-steps" aria-label="发布步骤">
@@ -631,19 +748,11 @@ export function PublishPage() {
             <section className="task-capsule">
               <header className="capsule-head">
                 <div>
-                  <span className="capsule-signal" aria-hidden="true">
-                    <i />
-                    <i />
-                    <i />
-                  </span>
                   <span>
-                    <small>任务说明 / 第 1 步</small>
+                    <small>任务说明</small>
                     <strong>{title.trim() || '未命名任务'}</strong>
                   </span>
                 </div>
-                <span className="capsule-state">
-                  <CircleDot aria-hidden="true" /> 草稿
-                </span>
               </header>
 
               <div className="capsule-body">
@@ -657,17 +766,15 @@ export function PublishPage() {
                       placeholder="例如：代数题逐题校验 / Batch 01"
                     />
                   </label>
-                  <fieldset className="field capsule-category-field">
-                    <legend>
-                      任务类型 <small>选一个最接近的分类</small>
-                    </legend>
-                    <div className="capsule-category-track">
+                  <fieldset className="field">
+                    <legend>任务类型</legend>
+                    <div className="choice-row capsule-category-row">
                       {CATEGORIES.map((item) => (
                         <label
                           key={item.value}
-                          className={`category-cassette category-${item.value}${
-                            category === item.value ? ' category-cassette-active' : ''
-                          }`}
+                          className={
+                            category === item.value ? 'choice-chip choice-chip-active' : 'choice-chip'
+                          }
                         >
                           <input
                             type="radio"
@@ -676,14 +783,7 @@ export function PublishPage() {
                             checked={category === item.value}
                             onChange={() => setCategory(item.value)}
                           />
-                          <span className="category-glyph">
-                            <CategoryGlyph category={item.value} />
-                          </span>
-                          <span className="category-copy">
-                            <strong>{item.label}</strong>
-                            <small>{item.detail}</small>
-                          </span>
-                          <span className="category-lock" aria-hidden="true" />
+                          {item.label}
                         </label>
                       ))}
                     </div>
@@ -852,9 +952,8 @@ export function PublishPage() {
               </div>
               <footer className="capsule-foot">
                 <span>
-                  <LockKeyhole aria-hidden="true" /> 任务说明、示例和每条数据不会显示给 Runner 主人
+                  <LockKeyhole aria-hidden="true" /> 这些内容只给执行任务的 Agent 看
                 </span>
-                <strong>AP-TASK / V1</strong>
               </footer>
             </section>
           </div>
@@ -866,350 +965,263 @@ export function PublishPage() {
               <div className="form-section-heading">
                 <span>02</span>
                 <div>
-                  <h2>添加任务数据</h2>
-                  <p>每一行对应一条任务。添加后再选择结果保存在哪里。</p>
+                  <h2>数据在哪</h2>
+                  <p>文件放在你自己的地址，或先粘贴一小批试试。</p>
                 </div>
               </div>
 
-              <div className="unit-toolbar">
-                <div className="segment-control" role="group" aria-label="输入格式">
-                  <button
-                    type="button"
-                    className={parseMode === 'lines' ? 'active' : ''}
-                    onClick={() => setParseMode('lines')}
-                  >
-                    每行一条
-                  </button>
-                  <button
-                    type="button"
-                    className={parseMode === 'jsonl' ? 'active' : ''}
-                    onClick={() => setParseMode('jsonl')}
-                  >
-                    JSONL
-                  </button>
-                </div>
-                <label className="button button-outline button-small file-button">
-                  <Upload aria-hidden="true" /> 导入 .txt / .jsonl
-                  <input
-                    type="file"
-                    accept=".txt,.jsonl,.ndjson,text/plain,application/x-ndjson"
-                    onChange={importFile}
-                  />
-                </label>
-              </div>
-
-              <label className="field unit-editor">
-                <span>
-                  {parseMode === 'lines'
-                    ? '每个非空行会成为一条独立任务，并生成唯一 ID'
-                    : '普通 JSON 值原样作为 input；只有 {$unit:{label,input,expectedOutput}} 是包装'}
-                </span>
-                <textarea
-                  className="code-input"
-                  value={rawUnits}
-                  onChange={(event) => {
-                    setRawUnits(event.target.value);
-                    setUnits([]);
-                    setQuote(null);
-                  }}
-                  rows={13}
-                  placeholder={
-                    parseMode === 'lines'
-                      ? '题目 1\n题目 2\n题目 3'
-                      : '{"question":"普通对象即使有 input 字段也原样保留"}\n{"$unit":{"label":"question-0002","input":{"question":"..."},"expectedOutput":{"answer":"42"}}}'
-                  }
-                />
-              </label>
-              {parseMode === 'jsonl' ? (
-                <div className="unit-envelope-note">
-                  <ShieldCheck aria-hidden="true" />
-                  <p>
-                    <strong>JSONL 规则。</strong>普通对象会原样作为任务数据；只有明确的{' '}
-                    <code>$unit</code> envelope 才提取 label 与隐藏 expectedOutput。
-                  </p>
-                </div>
-              ) : null}
-              <div className="unit-parse-bar">
-                <button
-                  className="button button-secondary"
-                  type="button"
-                  onClick={parseCurrentUnits}
-                >
-                  <FileJson2 aria-hidden="true" /> 检查数据
-                </button>
-                <span>
-                  {units.length
-                    ? `已识别 ${units.length.toLocaleString('zh-CN')} 条任务`
-                    : '支持 2–20,000 条任务'}
-                </span>
-              </div>
-              {parseError ? (
-                <div className="form-error" role="alert">
-                  {parseError}
-                </div>
-              ) : null}
-
-              {units.length ? (
-                <div className="unit-preview capsule-unit-preview">
-                  <div className="unit-preview-head">
-                    <div>
-                      <strong>任务数据预览</strong>
-                      <span>显示前 {Math.min(units.length, 6)} 条</span>
-                    </div>
-                    <div className="coverage-readout">
-                      <span>已提供预设答案</span>
-                      <strong>
-                        {coverage.covered}/{coverage.total} · {coverage.percent}%
-                      </strong>
-                    </div>
-                  </div>
-                  {units.slice(0, 6).map((unit, index) => (
-                    <div className="capsule-unit-row" key={index}>
-                      <span>{String(index + 1).padStart(4, '0')}</span>
-                      <div>
-                        <small>外部引用 ID</small>
-                        <strong>{unit.label}</strong>
-                      </div>
-                      <code>{printableValue(unit.input)}</code>
-                      <span
-                        className={
-                          unit.expectedOutput === undefined ? 'coverage-miss' : 'coverage-hit'
-                        }
-                      >
-                        {unit.expectedOutput === undefined
-                          ? '未提供预设答案'
-                          : `预设 ${printableValue(unit.expectedOutput, 48)}`}
-                      </span>
-                    </div>
-                  ))}
-                  {references.length ? (
-                    <div className="form-error" role="alert">
-                      {references.join('；')}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-            </section>
-
-            <section className="capsule-section-card delivery-contract-card">
-              <div className="capsule-subhead">
-                <div>
-                  <span className="section-index">结果去向</span>
-                  <h2>结果交到哪里？</h2>
-                </div>
-              </div>
               <div className="delivery-target-grid">
                 <button
                   type="button"
-                  className={
-                    deliveryTarget === 'platform' ? 'delivery-target active' : 'delivery-target'
-                  }
-                  onClick={() => setTarget('platform')}
+                  className={datasetMode === 'https' ? 'delivery-target active' : 'delivery-target'}
+                  onClick={() => selectDatasetMode('https')}
                 >
-                  <Layers3 aria-hidden="true" />
+                  <Globe2 aria-hidden="true" />
                   <span>
-                    <strong>保存在平台</strong>
-                    <small>平台加密保存结果，支持自动检查或人工确认</small>
+                    <strong>文件地址</strong>
+                    <small>放一份 JSONL，发布后不要改</small>
                   </span>
-                  {deliveryTarget === 'platform' ? <CheckCircle2 aria-hidden="true" /> : null}
+                  {datasetMode === 'https' ? <CheckCircle2 aria-hidden="true" /> : null}
                 </button>
                 <button
                   type="button"
-                  className={
-                    deliveryTarget === 'webhook' ? 'delivery-target active warm' : 'delivery-target'
-                  }
-                  onClick={() => setTarget('webhook')}
+                  className={datasetMode === 'inline' ? 'delivery-target active' : 'delivery-target'}
+                  onClick={() => selectDatasetMode('inline')}
                 >
-                  <Webhook aria-hidden="true" />
+                  <FileJson2 aria-hidden="true" />
                   <span>
-                    <strong>发送到回调地址（Webhook，实验）</strong>
-                    <small>结果不存平台，只保留外部服务的确认摘要</small>
+                    <strong>粘贴 / 导入</strong>
+                    <small>适合先试几条</small>
                   </span>
-                  {deliveryTarget === 'webhook' ? <CheckCircle2 aria-hidden="true" /> : null}
+                  {datasetMode === 'inline' ? <CheckCircle2 aria-hidden="true" /> : null}
                 </button>
               </div>
 
-              <fieldset className="field format-field">
-                <legend>结果格式</legend>
-                <div className="segment-control">
-                  <button
-                    type="button"
-                    className={deliveryFormat === 'text' ? 'active' : ''}
-                    onClick={() => setFormat('text')}
-                  >
-                    TEXT
-                  </button>
-                  <button
-                    type="button"
-                    className={deliveryFormat === 'json' ? 'active' : ''}
-                    onClick={() => setFormat('json')}
-                  >
-                    JSON
-                  </button>
-                </div>
-              </fieldset>
-
-              {deliveryFormat === 'json' ? (
-                <label className="field schema-editor-field">
-                  <span>
-                    JSON Schema <small>只检查结构，不代表正确性或质量</small>
-                  </span>
-                  <textarea
-                    className="code-input"
-                    value={schemaText}
-                    onChange={(event) => setSchemaText(event.target.value)}
-                    rows={7}
-                    placeholder={
-                      '{"type":"object","required":["answer"],"properties":{"answer":{"type":"string"}}}'
-                    }
-                  />
-                  <span
-                    className={
-                      schemaState.error
-                        ? 'schema-parse-state schema-parse-error'
-                        : schemaState.value
-                          ? 'schema-parse-state schema-parse-ready'
-                          : 'schema-parse-state'
-                    }
-                    role="status"
-                  >
-                    {schemaState.error ? (
-                      <>
-                        <X aria-hidden="true" /> {schemaState.error}
-                      </>
-                    ) : schemaState.value ? (
-                      <>
-                        <Check aria-hidden="true" /> JSON 语法已解析；发布时服务端仍会再次检查
-                        Schema
-                      </>
-                    ) : (
-                      '等待 Schema；不用 Schema 检查时可以留空。'
-                    )}
-                  </span>
-                </label>
-              ) : null}
-
-              {deliveryTarget === 'webhook' ? (
-                <div className="webhook-config">
-                  <div className="webhook-warning">
-                    <AlertTriangle aria-hidden="true" />
-                    <p>
-                      <strong>结果会直接发送给外部服务，不是隐身通道。</strong>外部服务会看到 Runner
-                      的网络地址； Runner 主人需要在领取时明确允许回调地址（
-                      <code>--allow-webhooks</code>）。
-                    </p>
-                  </div>
+              {datasetMode === 'https' ? (
+                <>
                   <label className="field">
-                    <span>
-                      回调地址（Webhook HTTPS URL） <small>使用不可猜的长 path 作为入站授权</small>
-                    </span>
+                    <span>JSONL 地址</span>
                     <span className="input-shell">
                       <Globe2 aria-hidden="true" />
                       <input
                         type="url"
-                        value={webhookUrl}
-                        onChange={(event) => setWebhookUrl(event.target.value)}
-                        placeholder="https://hooks.example.com/agentpool/a8f3…"
+                        value={datasetUrl}
+                        onChange={(event) => {
+                          const nextUrl = event.target.value;
+                          setDatasetUrl(nextUrl);
+                          if (datasetCheckedUrl && nextUrl.trim() !== datasetCheckedUrl) {
+                            setRemoteUnitCount(0);
+                            setDatasetCheckedUrl('');
+                            setDatasetHost(null);
+                          }
+                          setQuote(null);
+                        }}
+                        placeholder="https://files.example.com/batch.jsonl"
                       />
                     </span>
-                    <small>
-                      平台不会向 callback 发送 receipt secret；URL 的不可猜 path 负责入站授权。
-                    </small>
                   </label>
-                  <div className="receipt-secret-card">
-                    <div>
-                      <KeyRound aria-hidden="true" />
-                      <span>
-                        <strong>回执签名密钥（Receipt HMAC secret）</strong>
-                        <small>用来确认回执没有被篡改 · 平台加密保存 · 发布后不回显</small>
-                      </span>
+                  <div className="unit-envelope-note">
+                    <ShieldCheck aria-hidden="true" />
+                    <p>
+                      <strong>发布后请保持这份文件不变。</strong>
+                      做任务时会按行来取，改了文件会对不上。
+                    </p>
+                  </div>
+                  <div className="unit-parse-bar">
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      disabled={checkingDataset}
+                      onClick={() => void checkHttpsDataset()}
+                    >
+                      <Globe2 aria-hidden="true" /> {checkingDataset ? '正在检查…' : '检查地址'}
+                    </button>
+                    <span>
+                      {httpsReady
+                        ? `已确认 ${remoteUnitCount.toLocaleString('zh-CN')} 条${
+                            datasetHost ? ` · ${datasetHost}` : ''
+                          }`
+                        : '填写地址后先检查，确认条数再继续'}
+                    </span>
+                  </div>
+                  {parseError ? (
+                    <div className="form-error" role="alert">
+                      {parseError}
                     </div>
-                    <input
-                      aria-label="回执签名密钥，已隐藏"
-                      type="password"
-                      value={receiptSecret}
-                      readOnly
-                      tabIndex={-1}
-                    />
-                    <div>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <div className="unit-toolbar">
+                    <div className="segment-control" role="group" aria-label="输入格式">
                       <button
-                        className="button button-primary button-small"
                         type="button"
-                        disabled={secretCopied}
-                        onClick={() => void copySecretOnce()}
+                        className={parseMode === 'lines' ? 'active' : ''}
+                        onClick={() => setParseMode('lines')}
                       >
-                        <Copy aria-hidden="true" /> {secretCopied ? '已复制一次' : '一次性复制'}
+                        每行一条
                       </button>
                       <button
-                        className="button button-outline button-small"
                         type="button"
-                        onClick={regenerateSecret}
+                        className={parseMode === 'jsonl' ? 'active' : ''}
+                        onClick={() => setParseMode('jsonl')}
                       >
-                        <RefreshCw aria-hidden="true" /> 重新生成
+                        JSONL
                       </button>
                     </div>
-                    {copyNotice ? <p role="status">{copyNotice}</p> : null}
+                    <label className="button button-outline button-small file-button">
+                      <Upload aria-hidden="true" /> 导入 .txt / .jsonl
+                      <input
+                        type="file"
+                        accept=".txt,.jsonl,.ndjson,text/plain,application/x-ndjson"
+                        onChange={(event) => void importFile(event)}
+                      />
+                    </label>
                   </div>
-                  <div className="webhook-protocol-grid">
-                    <article>
-                      <span>回调请求（CALLBACK REQUEST）</span>
-                      <CopyCommand command={callbackExample()} />
-                    </article>
-                    <article>
-                      <span>确认回执（ACCEPTANCE RECEIPT）</span>
-                      <CopyCommand command={receiptExample()} />
-                    </article>
-                  </div>
-                  <p className="protocol-boundary">
-                    回执签名密钥只用于 HMAC 签名（确认回执未被篡改）。示例永远使用
-                    [REDACTED]，不包含真实 secret。
-                  </p>
-                </div>
-              ) : null}
 
+                  <label className="field unit-editor">
+                    <span>
+                      {parseMode === 'lines'
+                        ? '每个非空行会成为一条独立任务，并生成唯一 ID'
+                        : '普通 JSON 值原样作为 input；只有 {$unit:{label,input,expectedOutput}} 是包装'}
+                    </span>
+                    <textarea
+                      className="code-input"
+                      value={rawUnits}
+                      onChange={(event) => {
+                        setRawUnits(event.target.value);
+                        setUnits([]);
+                        setQuote(null);
+                      }}
+                      rows={13}
+                      placeholder={
+                        parseMode === 'lines'
+                          ? '题目 1\n题目 2\n题目 3'
+                          : '{"question":"普通对象即使有 input 字段也原样保留"}\n{"$unit":{"label":"question-0002","input":{"question":"..."},"expectedOutput":{"answer":"42"}}}'
+                      }
+                    />
+                  </label>
+                  {parseMode === 'jsonl' ? (
+                    <div className="unit-envelope-note">
+                      <ShieldCheck aria-hidden="true" />
+                      <p>
+                        <strong>每行一个 JSON。</strong>只有带 <code>$unit</code>{' '}
+                        的行才会拆出编号和预设答案。
+                      </p>
+                    </div>
+                  ) : null}
+                  <div className="unit-parse-bar">
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      onClick={parseCurrentUnits}
+                    >
+                      <FileJson2 aria-hidden="true" /> 检查数据
+                    </button>
+                    <span>
+                      {units.length
+                        ? `已识别 ${units.length.toLocaleString('zh-CN')} 条任务`
+                        : '解析成功后会显示条数'}
+                    </span>
+                  </div>
+                  {parseError ? (
+                    <div className="form-error" role="alert">
+                      {parseError}
+                    </div>
+                  ) : null}
+
+                  {units.length ? (
+                    <div className="unit-preview capsule-unit-preview">
+                      <div className="unit-preview-head">
+                        <div>
+                          <strong>任务数据预览</strong>
+                          <span>显示前 {Math.min(units.length, 6)} 条</span>
+                        </div>
+                        <div className="coverage-readout">
+                          <span>已提供预设答案</span>
+                          <strong>
+                            {coverage.covered}/{coverage.total} · {coverage.percent}%
+                          </strong>
+                        </div>
+                      </div>
+                      {units.slice(0, 6).map((unit, index) => (
+                        <div className="capsule-unit-row" key={index}>
+                          <span>{String(index + 1).padStart(4, '0')}</span>
+                          <div>
+                            <small>外部引用 ID</small>
+                            <strong>{unit.label}</strong>
+                          </div>
+                          <code>{printableValue(unit.input)}</code>
+                          <span
+                            className={
+                              unit.expectedOutput === undefined ? 'coverage-miss' : 'coverage-hit'
+                            }
+                          >
+                            {unit.expectedOutput === undefined
+                              ? '未提供预设答案'
+                              : `预设 ${printableValue(unit.expectedOutput, 48)}`}
+                          </span>
+                        </div>
+                      ))}
+                      {references.length ? (
+                        <div className="form-error" role="alert">
+                          {references.join('；')}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </section>
+
+            <section className="capsule-section-card delivery-contract-card">
               <div className="acceptance-builder">
                 <div className="capsule-subhead">
                   <div>
-                    <span className="section-index">完成规则</span>
-                    <h2>{deliveryTarget === 'webhook' ? '由签名回执确认' : '怎样才算完成？'}</h2>
+                    <span className="section-index">怎样算做完</span>
+                    <h2>
+                      {deliveryTarget === 'webhook' ? '由你的地址确认' : '怎样才算完成？'}
+                    </h2>
                   </div>
                 </div>
-                {deliveryTarget === 'platform' ? (
-                  <div className="acceptance-option-grid">
-                    {ACCEPTANCE_OPTIONS.map((option) => {
-                      const schemaMode =
-                        option.value === 'schema' || option.value === 'schema_and_hidden_exact';
-                      const disabled = schemaMode && deliveryFormat !== 'json';
-                      return (
-                        <button
-                          type="button"
-                          key={option.value}
-                          disabled={disabled}
-                          className={
-                            acceptanceMode === option.value
-                              ? 'acceptance-option active'
-                              : 'acceptance-option'
-                          }
-                          onClick={() => setAcceptanceMode(option.value)}
-                        >
-                          <span>
-                            {acceptanceMode === option.value ? <Check aria-hidden="true" /> : null}
-                          </span>
-                          <strong>{option.label}</strong>
-                          <small>{disabled ? '先把结果格式切为 JSON' : option.detail}</small>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
+                {deliveryTarget === 'webhook' ? (
                   <div className="webhook-acceptance-lock">
                     <Webhook aria-hidden="true" />
                     <div>
-                      <strong>回调地址签名确认（Webhook / HMAC）</strong>
-                      <p>平台不保存结果；只记录外部服务的确认状态与结果指纹（digest）。</p>
+                      <strong>在高级里填接收地址</strong>
+                      <p>结果发到你给的地址，由那边确认。</p>
                     </div>
                   </div>
+                ) : (
+                  <div className="acceptance-option-grid">
+                    {DEFAULT_ACCEPTANCE_OPTIONS.map((option) => (
+                      <button
+                        type="button"
+                        key={option.value}
+                        className={
+                          acceptanceMode === option.value
+                            ? 'acceptance-option active'
+                            : 'acceptance-option'
+                        }
+                        onClick={() => selectAcceptance(option.value)}
+                      >
+                        <span>
+                          {acceptanceMode === option.value ? <Check aria-hidden="true" /> : null}
+                        </span>
+                        <strong>{option.label}</strong>
+                        <small>{option.detail}</small>
+                      </button>
+                    ))}
+                  </div>
                 )}
+                {advancedAcceptance ? (
+                  <p className="protocol-boundary">当前使用高级完成规则，细节在下方「高级」里。</p>
+                ) : null}
+                {datasetMode === 'https' && exactMode ? (
+                  <p className="protocol-boundary">
+                    选这个时，文件里每条都要带预设答案。
+                  </p>
+                ) : null}
 
                 <div className="acceptance-check-list">
                   {checks.map((check) => (
@@ -1225,18 +1237,221 @@ export function PublishPage() {
                         <strong>{plainCheckText(check.label)}</strong>
                         <small>{plainCheckText(check.detail)}</small>
                       </div>
-                      <em>{plainCheckText(check.coverage)}</em>
+                      <em>
+                        {datasetMode === 'https' && check.id === 'hidden_exact'
+                          ? '远程文件'
+                          : plainCheckText(check.coverage)}
+                      </em>
                     </article>
                   ))}
                 </div>
 
-                {acceptanceMode === 'hidden_exact' ||
-                acceptanceMode === 'schema_and_hidden_exact' ? (
-                  <details className="normalization-panel">
-                    <summary>
-                      答案比较方式 <span>默认严格</span> <ChevronDown aria-hidden="true" />
-                    </summary>
-                    <p>这些选项只影响答案比较时如何处理空白和大小写，不会改成语义评分。</p>
+                <details className="normalization-panel">
+                  <summary>
+                    高级 <span>格式检查、外部地址</span>{' '}
+                    <ChevronDown aria-hidden="true" />
+                  </summary>
+                  <p>需要检查格式，或把结果发到外部地址时再打开。</p>
+
+                  <div className="delivery-target-grid">
+                    <button
+                      type="button"
+                      className={
+                        deliveryTarget === 'platform' ? 'delivery-target active' : 'delivery-target'
+                      }
+                      onClick={() => setTarget('platform')}
+                    >
+                      <Layers3 aria-hidden="true" />
+                      <span>
+                        <strong>保存在这里</strong>
+                        <small>做完后你可以在详情里看结果</small>
+                      </span>
+                      {deliveryTarget === 'platform' ? <CheckCircle2 aria-hidden="true" /> : null}
+                    </button>
+                    <button
+                      type="button"
+                      className={
+                        deliveryTarget === 'webhook'
+                          ? 'delivery-target active warm'
+                          : 'delivery-target'
+                      }
+                      onClick={() => setTarget('webhook')}
+                    >
+                      <Webhook aria-hidden="true" />
+                      <span>
+                        <strong>发到你的地址</strong>
+                        <small>结果直接送到你给的网址</small>
+                      </span>
+                      {deliveryTarget === 'webhook' ? <CheckCircle2 aria-hidden="true" /> : null}
+                    </button>
+                  </div>
+
+                  <fieldset className="field format-field">
+                    <legend>结果格式</legend>
+                    <div className="segment-control">
+                      <button
+                        type="button"
+                        className={deliveryFormat === 'text' ? 'active' : ''}
+                        onClick={() => setFormat('text')}
+                      >
+                        TEXT
+                      </button>
+                      <button
+                        type="button"
+                        className={deliveryFormat === 'json' ? 'active' : ''}
+                        onClick={() => setFormat('json')}
+                      >
+                        JSON
+                      </button>
+                    </div>
+                  </fieldset>
+
+                  {deliveryFormat === 'json' ? (
+                    <label className="field schema-editor-field">
+                      <span>
+                        JSON Schema <small>只检查结构，不代表正确性或质量</small>
+                      </span>
+                      <textarea
+                        className="code-input"
+                        value={schemaText}
+                        onChange={(event) => setSchemaText(event.target.value)}
+                        rows={7}
+                        placeholder={
+                          '{"type":"object","required":["answer"],"properties":{"answer":{"type":"string"}}}'
+                        }
+                      />
+                      <span
+                        className={
+                          schemaState.error
+                            ? 'schema-parse-state schema-parse-error'
+                            : schemaState.value
+                              ? 'schema-parse-state schema-parse-ready'
+                              : 'schema-parse-state'
+                        }
+                        role="status"
+                      >
+                        {schemaState.error ? (
+                          <>
+                            <X aria-hidden="true" /> {schemaState.error}
+                          </>
+                        ) : schemaState.value ? (
+                          <>
+                            <Check aria-hidden="true" /> JSON 语法已解析；发布时服务端仍会再次检查
+                            Schema
+                          </>
+                        ) : (
+                          '等待 Schema；不用 Schema 检查时可以留空。'
+                        )}
+                      </span>
+                    </label>
+                  ) : null}
+
+                  {deliveryTarget === 'platform' ? (
+                    <div className="acceptance-option-grid">
+                      {ADVANCED_ACCEPTANCE_OPTIONS.map((option) => {
+                        const disabled = deliveryFormat !== 'json';
+                        return (
+                          <button
+                            type="button"
+                            key={option.value}
+                            disabled={disabled}
+                            className={
+                              acceptanceMode === option.value
+                                ? 'acceptance-option active'
+                                : 'acceptance-option'
+                            }
+                            onClick={() => selectAcceptance(option.value)}
+                          >
+                            <span>
+                              {acceptanceMode === option.value ? (
+                                <Check aria-hidden="true" />
+                              ) : null}
+                            </span>
+                            <strong>{option.label}</strong>
+                            <small>{disabled ? '先把结果格式切为 JSON' : option.detail}</small>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+
+                  {deliveryTarget === 'webhook' ? (
+                    <div className="webhook-config">
+                      <div className="webhook-warning">
+                        <AlertTriangle aria-hidden="true" />
+                        <p>
+                          <strong>结果会直接发到这个地址。</strong>
+                          领取的人需要同意外发，对方也看得到来源网络。
+                        </p>
+                      </div>
+                      <label className="field">
+                        <span>
+                          接收地址 <small>必须是 HTTPS</small>
+                        </span>
+                        <span className="input-shell">
+                          <Globe2 aria-hidden="true" />
+                          <input
+                            type="url"
+                            value={webhookUrl}
+                            onChange={(event) => setWebhookUrl(event.target.value)}
+                            placeholder="https://hooks.example.com/agentpool/a8f3…"
+                          />
+                        </span>
+                        <small>
+                          请用一个不容易猜到的地址。
+                        </small>
+                      </label>
+                      <div className="receipt-secret-card">
+                        <div>
+                          <KeyRound aria-hidden="true" />
+                          <span>
+                            <strong>确认密钥</strong>
+                            <small>复制一次，关掉后看不到</small>
+                          </span>
+                        </div>
+                        <input
+                          aria-label="确认密钥，已隐藏"
+                          type="password"
+                          value={receiptSecret}
+                          readOnly
+                          tabIndex={-1}
+                        />
+                        <div>
+                          <button
+                            className="button button-primary button-small"
+                            type="button"
+                            disabled={secretCopied}
+                            onClick={() => void copySecretOnce()}
+                          >
+                            <Copy aria-hidden="true" /> {secretCopied ? '已复制一次' : '一次性复制'}
+                          </button>
+                          <button
+                            className="button button-outline button-small"
+                            type="button"
+                            onClick={regenerateSecret}
+                          >
+                            <RefreshCw aria-hidden="true" /> 重新生成
+                          </button>
+                        </div>
+                        {copyNotice ? <p role="status">{copyNotice}</p> : null}
+                      </div>
+                      <div className="webhook-protocol-grid">
+                        <article>
+                          <span>发出去的内容</span>
+                          <CopyCommand command={callbackExample()} />
+                        </article>
+                        <article>
+                          <span>对方回过来的确认</span>
+                          <CopyCommand command={receiptExample()} />
+                        </article>
+                      </div>
+                      <p className="protocol-boundary">
+                        示例里的签名是 [REDACTED]，不会带上真实密钥。
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {exactMode ? (
                     <div className="normalization-grid">
                       <label>
                         <input
@@ -1293,8 +1508,8 @@ export function PublishPage() {
                         />
                       </label>
                     </div>
-                  </details>
-                ) : null}
+                  ) : null}
+                </details>
               </div>
             </section>
           </div>
@@ -1306,7 +1521,7 @@ export function PublishPage() {
               <div className="form-section-heading">
                 <span>03</span>
                 <div>
-                  <h2>设置 Agent、执行数量和预算</h2>
+                  <h2>花多少、何时截止、是否先试几条</h2>
                   <p>建议先开放 1–3 条试跑；你看过结果后，再手动开放剩余任务。</p>
                 </div>
               </div>
@@ -1332,7 +1547,7 @@ export function PublishPage() {
                   <Rocket aria-hidden="true" />
                   <span>
                     <strong>全部开放</strong>
-                    <small>发布后立即开放所有任务，等待 Runner 主人主动领取</small>
+                    <small>发布后就可以被人领</small>
                   </span>
                 </button>
               </div>
@@ -1343,7 +1558,7 @@ export function PublishPage() {
                     <span>试跑条数</span>
                     <NumberDraftInput
                       min={1}
-                      max={Math.min(3, Math.max(1, units.length))}
+                      max={Math.min(3, Math.max(1, unitCount))}
                       value={pilotUnits}
                       onValueChange={setPilotUnits}
                     />
@@ -1360,8 +1575,38 @@ export function PublishPage() {
 
               <div className="capacity-grid ignition-capacity-grid">
                 <div className="wizard-form">
+                  <div className="form-grid-2">
+                    <label className="field">
+                      <span>每条任务奖励</span>
+                      <span className="input-shell">
+                        <Zap aria-hidden="true" />
+                        <NumberDraftInput
+                          min={1}
+                          max={1_000_000}
+                          value={rewardPerUnit}
+                          onValueChange={(value) => {
+                            setRewardPerUnit(value);
+                            setQuote(null);
+                          }}
+                        />
+                      </span>
+                      <small>每条给多少积分</small>
+                    </label>
+                    <label className="field">
+                      <span>全部任务的截止时间</span>
+                      <input
+                        type="datetime-local"
+                        value={deadlineAt}
+                        onChange={(event) => {
+                          setDeadlineAt(event.target.value);
+                          setQuote(null);
+                        }}
+                      />
+                    </label>
+                  </div>
+
                   <fieldset className="field">
-                    <legend>指定 Agent</legend>
+                    <legend>用哪个来做</legend>
                     <div className="agent-selector">
                       {(['codex', 'claude'] as const).map((agent) => {
                         const item = catalog.find((entry) => entry.adapter === agent);
@@ -1383,7 +1628,7 @@ export function PublishPage() {
                             <Bot aria-hidden="true" />
                             <span>
                               <strong>{agent === 'codex' ? 'Codex' : 'Claude'}</strong>
-                              <small>{item?.models.length || 0} 个有历史性能记录的模型</small>
+                              <small>目前可接</small>
                             </span>
                             {requestedAgent === agent ? <CheckCircle2 aria-hidden="true" /> : null}
                           </label>
@@ -1393,7 +1638,7 @@ export function PublishPage() {
                   </fieldset>
                   <label className="field exact-model-field">
                     <span>
-                      使用的模型 <small>需要准确填写；平台不会换成别的模型</small>
+                      模型 <small>填写要用的那个</small>
                     </span>
                     <span className="input-shell">
                       <Cpu aria-hidden="true" />
@@ -1421,7 +1666,7 @@ export function PublishPage() {
                         <Gauge aria-hidden="true" />
                         <NumberDraftInput
                           min={1}
-                          max={Math.max(1, units.length)}
+                          max={Math.max(1, unitCount)}
                           value={requiredConcurrency}
                           onValueChange={(value) => {
                             setRequiredConcurrency(value);
@@ -1429,7 +1674,7 @@ export function PublishPage() {
                           }}
                         />
                       </span>
-                      <small>同一时刻最多执行这么多条；不会触发自动派发</small>
+                      <small>同一时间最多做这么多条</small>
                     </label>
                     <label className="field">
                       <span>每条任务最长执行时间</span>
@@ -1448,35 +1693,6 @@ export function PublishPage() {
                       <small>秒，超时会按设置重试</small>
                     </label>
                   </div>
-                  <div className="form-grid-2">
-                    <label className="field">
-                      <span>全部任务的截止时间</span>
-                      <input
-                        type="datetime-local"
-                        value={deadlineAt}
-                        onChange={(event) => {
-                          setDeadlineAt(event.target.value);
-                          setQuote(null);
-                        }}
-                      />
-                    </label>
-                    <label className="field">
-                      <span>每条任务奖励</span>
-                      <span className="input-shell">
-                        <Zap aria-hidden="true" />
-                        <NumberDraftInput
-                          min={1}
-                          max={1_000_000}
-                          value={rewardPerUnit}
-                          onValueChange={(value) => {
-                            setRewardPerUnit(value);
-                            setQuote(null);
-                          }}
-                        />
-                      </span>
-                      <small>PULSE · 演示积分 / 非真实法币</small>
-                    </label>
-                  </div>
                 </div>
 
                 <aside className="budget-card ignition-budget-card">
@@ -1484,25 +1700,25 @@ export function PublishPage() {
                     <WalletCards aria-hidden="true" />
                   </div>
                   <span className="mono-label">预计锁定预算</span>
-                  <strong>{credits(budget)}</strong>
-                  <span className="pulse-boundary-tag">演示积分 / 非真实法币</span>
+                  <strong>{points(budget)}</strong>
+                  <span className="pulse-boundary-tag">现在还不是真钱</span>
                   <dl>
                     <div>
                       <dt>任务条数</dt>
-                      <dd>{units.length.toLocaleString('zh-CN')}</dd>
+                      <dd>{unitCount.toLocaleString('zh-CN')}</dd>
                     </div>
                     <div>
                       <dt>首次开放</dt>
-                      <dd>{launchMode === 'pilot' ? pilotUnits : units.length}</dd>
+                      <dd>{launchMode === 'pilot' ? pilotUnits : unitCount}</dd>
                     </div>
                     <div>
                       <dt>当前可消费</dt>
-                      <dd>{credits(wallet?.purchasedAvailable || 0)}</dd>
+                      <dd>{points(wallet?.purchasedAvailable || 0)}</dd>
                     </div>
                   </dl>
                   {budget <= (wallet?.purchasedAvailable || 0) ? (
                     <p className="budget-ok">
-                      <Check aria-hidden="true" /> 发布时锁定全部预算，试跑后由你决定是否继续
+                      <Check aria-hidden="true" /> 发布时会先扣下这些积分
                     </p>
                   ) : null}
                 </aside>
@@ -1516,8 +1732,8 @@ export function PublishPage() {
             <div className="form-section-heading">
               <span>04</span>
               <div>
-                <h2>检查设置并发布</h2>
-                <p>最后确认 Agent 会看到什么、首次开放多少条，以及结果保存在哪里。</p>
+                <h2>看一下再发布</h2>
+                <p>确认先开放多少条，以及结果送到哪里。</p>
               </div>
             </div>
 
@@ -1535,7 +1751,7 @@ export function PublishPage() {
               <div className="ignition-sequence">
                 <article className="active">
                   <span>首次开放</span>
-                  <strong>{launchMode === 'pilot' ? pilotUnits : units.length}</strong>
+                  <strong>{launchMode === 'pilot' ? pilotUnits : unitCount}</strong>
                   <small>{launchMode === 'pilot' ? '条试跑任务' : '条全部任务'}</small>
                 </article>
                 <ArrowRight aria-hidden="true" />
@@ -1547,12 +1763,12 @@ export function PublishPage() {
                 <ArrowRight aria-hidden="true" />
                 <article className={launchMode === 'pilot' ? 'warm' : 'active'}>
                   <span>后续操作</span>
-                  <strong>{launchMode === 'pilot' ? '你来确认' : 'Runner 主动领取'}</strong>
-                  <small>{launchMode === 'pilot' ? '看过结果后手动开放' : '不会自动派发'}</small>
+                  <strong>{launchMode === 'pilot' ? '你来确认' : '等人来领'}</strong>
+                  <small>{launchMode === 'pilot' ? '看过试跑再开放剩下的' : '发布后即可领取'}</small>
                 </article>
               </div>
               {launchMode === 'pilot' ? (
-                <p>试跑结果全部通过后，剩余任务仍不会自动开放；你需要在详情页手动确认。</p>
+                <p>试跑通过后，再在详情页开放剩下的。</p>
               ) : null}
             </section>
 
@@ -1573,12 +1789,8 @@ export function PublishPage() {
                   <span>
                     <strong>
                       {quote.feasible
-                        ? deliveryTarget === 'webhook'
-                          ? '当前支持回调地址的 Runner 较多'
-                          : '当前可用 Runner 较多'
-                        : deliveryTarget === 'webhook'
-                          ? '当前支持回调地址的 Runner 有限'
-                          : '当前可用 Runner 有限'}
+                        ? '现在有人能接'
+                        : '现在能接的人不多'}
                     </strong>
                     <small>
                       {quote.adapter} / {quote.model}
@@ -1619,15 +1831,7 @@ export function PublishPage() {
                   ))}
                 </ul>
               ) : null}
-              {deliveryTarget === 'webhook' ? (
-                <p className="webhook-capacity-note">
-                  这里只统计明确支持 Webhook（回调地址）、且 Agent 和模型匹配的 Runner。
-                </p>
-              ) : null}
-              <p className="webhook-capacity-note">
-                这些数字只是此刻的参考，不会预订 Runner，也不会自动派发。发布后仍需要 Runner
-                主人主动领取。
-              </p>
+              <p className="webhook-capacity-note">这些数字是现在的参考，发布后等人来领。</p>
             </div>
 
             <div className="compiled-contract-grid">
@@ -1636,8 +1840,8 @@ export function PublishPage() {
                   <div>
                     <Code2 aria-hidden="true" />
                     <span>
-                      <small>Agent 实际看到的内容</small>
-                      <strong>Agent 将收到的任务说明</strong>
+                      <small>对方会看到</small>
+                      <strong>任务说明</strong>
                     </span>
                   </div>
                   <span>V1</span>
@@ -1648,6 +1852,14 @@ export function PublishPage() {
                 <span className="section-index">任务设置</span>
                 <dl>
                   <div>
+                    <dt>数据来源</dt>
+                    <dd>
+                      {datasetMode === 'https'
+                        ? `${datasetHost || webhookHostname(datasetUrl)} · ${unitCount.toLocaleString('zh-CN')} 条`
+                        : `粘贴导入 · ${unitCount.toLocaleString('zh-CN')} 条`}
+                    </dd>
+                  </div>
+                  <div>
                     <dt>结果格式</dt>
                     <dd>{deliveryFormat.toUpperCase()}</dd>
                   </div>
@@ -1655,21 +1867,21 @@ export function PublishPage() {
                     <dt>完成规则</dt>
                     <dd>
                       {acceptanceMode === 'webhook'
-                        ? '回调地址签名回执'
+                        ? '由你的地址确认'
                         : ACCEPTANCE_OPTIONS.find((option) => option.value === acceptanceMode)
                             ?.label || acceptanceMode}
                     </dd>
                   </div>
                   <div>
                     <dt>预设答案覆盖</dt>
-                    <dd>{coverage.percent}%</dd>
+                    <dd>{datasetMode === 'https' ? '看文件' : `${coverage.percent}%`}</dd>
                   </div>
                   <div>
                     <dt>结果去向</dt>
                     <dd>
                       {deliveryTarget === 'webhook'
                         ? webhookHostname(webhookUrl)
-                        : '平台（加密保存）'}
+                        : '保存在这里'}
                     </dd>
                   </div>
                 </dl>
@@ -1693,8 +1905,7 @@ export function PublishPage() {
                 <div>
                   <strong>结果发送到 {webhookHostname(webhookUrl)}</strong>
                   <p>
-                    平台不保存结果；只保存外部回执状态、结果指纹（digest）和签名校验摘要（HMAC）。
-                    回执签名密钥会加密保存，且不会在详情页回显。
+                    结果直接发到这个地址，详情里只看确认情况。
                   </p>
                 </div>
               </div>
@@ -1704,8 +1915,7 @@ export function PublishPage() {
               <div className="capacity-warning">
                 <AlertTriangle aria-hidden="true" />
                 <p>
-                  <strong>你仍然可以发布。</strong>任务会开放给模型匹配的 Runner
-                  主人主动领取；系统不会自动启动，也不会换模型凑数。
+                  <strong>现在能接的人不多，你仍可以发布。</strong>
                 </p>
               </div>
             ) : null}
@@ -1726,12 +1936,12 @@ export function PublishPage() {
               {step < 4
                 ? `${step} / 4`
                 : launchMode === 'pilot'
-                  ? `首先发布 ${pilotUnits} 条试跑任务`
-                  : '将立即开放全部任务'}
+                  ? `先开放 ${pilotUnits} 条`
+                  : '开放全部'}
             </span>
             {step === 3 && budget > (wallet?.purchasedAvailable || 0) ? (
               <p className="budget-warning wizard-inline-warning">
-                <AlertTriangle aria-hidden="true" /> PULSE 不足
+                <AlertTriangle aria-hidden="true" /> 积分不足
               </p>
             ) : null}
             {step < 4 ? (
@@ -1739,12 +1949,20 @@ export function PublishPage() {
                 className="button button-primary"
                 type="button"
                 disabled={
-                  loadingQuote || (step === 3 && budget > (wallet?.purchasedAvailable || 0))
+                  loadingQuote ||
+                  checkingDataset ||
+                  (step === 3 && budget > (wallet?.purchasedAvailable || 0))
                 }
                 onClick={() => void next()}
               >
-                {loadingQuote ? '正在检查可用 Runner…' : step === 3 ? '检查并继续' : '继续'}{' '}
-                {!loadingQuote ? <ArrowRight aria-hidden="true" /> : null}
+                {loadingQuote || checkingDataset
+                  ? datasetMode === 'https' && step === 2
+                    ? '正在检查地址…'
+                    : '正在估算…'
+                  : step === 3
+                    ? '下一步'
+                    : '继续'}{' '}
+                {!loadingQuote && !checkingDataset ? <ArrowRight aria-hidden="true" /> : null}
               </button>
             ) : (
               <button
@@ -1756,8 +1974,8 @@ export function PublishPage() {
                 {publishing
                   ? '正在发布…'
                   : launchMode === 'pilot'
-                    ? `锁定 PULSE，发布 ${pilotUnits} 条试跑任务`
-                    : '锁定 PULSE，发布全部任务'}{' '}
+                    ? '发布试跑'
+                    : '发布'}{' '}
                 {!publishing ? <Flame aria-hidden="true" /> : null}
               </button>
             )}

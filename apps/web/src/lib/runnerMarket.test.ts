@@ -57,6 +57,8 @@ function pool(input: Partial<RunnerMarketPool> = {}): RunnerMarketPool {
     pilotFailedUnits: 0,
     pilotSubmittedUnits: 0,
     contractHash: 'hash',
+    datasetMode: 'inline',
+    datasetHost: null,
     terminalReason: null,
     createdAt: '2026-08-14T09:00:00.000Z',
     deliveryMode: 'platform',

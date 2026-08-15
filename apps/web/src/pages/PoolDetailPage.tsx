@@ -8,7 +8,6 @@ import {
   ChevronDown,
   Clock3,
   Cpu,
-  Fingerprint,
   Flame,
   Gauge,
   LockKeyhole,
@@ -32,7 +31,7 @@ import { printableValue } from '../lib/units';
 
 const UNIT_STATUS: Record<UnitStatus, string> = {
   queued: '排队',
-  leased: '已租用',
+  leased: '执行中',
   running: '执行中',
   submitted: '待验收',
   accepted: '已通过',
@@ -75,7 +74,7 @@ export function PoolDetailPage() {
         setPool(await api.getPool(poolId));
         setError(null);
       } catch (requestError) {
-        setError(requestError instanceof ApiError ? requestError.message : '无法读取任务池');
+        setError(requestError instanceof ApiError ? requestError.message : '无法读取这批任务');
       } finally {
         if (!quiet) setLoading(false);
       }
@@ -168,13 +167,13 @@ export function PoolDetailPage() {
     try {
       setPool(await api.launchPool(poolId));
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : '释放全池失败');
+      setError(requestError instanceof ApiError ? requestError.message : '开放剩余任务失败');
     } finally {
       setLaunching(false);
     }
   };
 
-  if (loading && !pool) return <LoadingState label="正在接入任务池" />;
+  if (loading && !pool) return <LoadingState label="正在读取这批任务" />;
   if (error && !pool) return <InlineError message={error} retry={() => void load()} />;
   if (!pool) return null;
 
@@ -234,7 +233,7 @@ export function PoolDetailPage() {
               type="button"
               onClick={() => setCancelOpen(true)}
             >
-              <Ban aria-hidden="true" /> 取消任务池
+              <Ban aria-hidden="true" /> 取消这批任务
             </button>
           ) : null}
         </div>
@@ -269,15 +268,15 @@ export function PoolDetailPage() {
             <Flame />
           </div>
           <div className="pilot-gate-copy">
-            <h2>Pilot 已全部通过，可以放量。</h2>
+            <h2>试跑已全部通过，可以开放剩余任务。</h2>
             <p>
-              {pilotAcceptedUnits}/{pilotUnitCount} accepted · {pilotFailedUnits} failed ·{' '}
-              {heldUnitCount.toLocaleString('zh-CN')} held。平台不会自动越过这道门。
+              {pilotAcceptedUnits}/{pilotUnitCount} 已通过 · {pilotFailedUnits} 失败 ·{' '}
+              {heldUnitCount.toLocaleString('zh-CN')} 条还没开放。
             </p>
           </div>
           <div
             className="pilot-gate-meter"
-            aria-label={`Pilot ${pilotAcceptedUnits}/${pilotUnitCount}`}
+            aria-label={`试跑 ${pilotAcceptedUnits}/${pilotUnitCount}`}
           >
             {Array.from({ length: pilotUnitCount }, (_, index) => (
               <i className={index < pilotAcceptedUnits ? 'accepted' : ''} key={index} />
@@ -289,12 +288,12 @@ export function PoolDetailPage() {
             disabled={!canLaunchHeld || launching}
             onClick={() => void launchHeldUnits()}
           >
-            {launching ? '正在释放…' : '释放全池'} <Rocket aria-hidden="true" />
+            {launching ? '正在开放…' : '开放剩余'} <Rocket aria-hidden="true" />
           </button>
         </section>
       ) : null}
 
-      <nav className="detail-tabs" aria-label="任务池详情">
+      <nav className="detail-tabs" aria-label="任务详情">
         <button
           type="button"
           className={tab === 'overview' ? 'active' : ''}
@@ -307,7 +306,7 @@ export function PoolDetailPage() {
           className={tab === 'results' ? 'active' : ''}
           onClick={() => setTab('results')}
         >
-          交付与验收 <span>{pool.submittedUnits + pool.acceptedUnits}</span>
+          结果 <span>{pool.submittedUnits + pool.acceptedUnits}</span>
         </button>
       </nav>
 
@@ -317,7 +316,7 @@ export function PoolDetailPage() {
             <div className="detail-block">
               <div className="section-bar">
                 <div>
-                  <h2>执行硬约束</h2>
+                  <h2>任务要求</h2>
                 </div>
               </div>
               <dl className="contract-grid">
@@ -329,7 +328,7 @@ export function PoolDetailPage() {
                 </div>
                 <div>
                   <dt>
-                    <Cpu aria-hidden="true" /> 精确模型
+                    <Cpu aria-hidden="true" /> 模型
                   </dt>
                   <dd>{pool.requestedModel}</dd>
                 </div>
@@ -341,39 +340,37 @@ export function PoolDetailPage() {
                 </div>
                 <div>
                   <dt>
-                    <Clock3 aria-hidden="true" /> 单 Unit 时限
+                    <Clock3 aria-hidden="true" /> 单条任务时限
                   </dt>
                   <dd>{duration(pool.maxUnitSeconds)}</dd>
                 </div>
                 <div>
                   <dt>
-                    <Boxes aria-hidden="true" /> Unit 奖励
+                    <Boxes aria-hidden="true" /> 单条奖励
                   </dt>
                   <dd className="contract-pulse">
                     {credits(pool.rewardPerUnit)}
-                    <small>演示积分 / 非真实法币</small>
                   </dd>
                 </div>
                 <div>
                   <dt>
-                    <CheckCircle2 aria-hidden="true" /> 验收
+                    <CheckCircle2 aria-hidden="true" /> 怎样算完
                   </dt>
                   <dd>
                     {capsule
-                      ? capsule.acceptance.mode
+                      ? {
+                          non_empty: '结果非空',
+                          hidden_exact: '与预设答案一致',
+                          manual: '人工确认',
+                          schema: '按格式检查',
+                          schema_and_hidden_exact: '格式和答案都要符合',
+                          webhook: '由你的地址确认',
+                        }[capsule.acceptance.mode] || capsule.acceptance.mode
                       : pool.validationMode === 'auto'
                         ? pool.outputSchema
-                          ? '自动验收（JSON Schema 结构检查）'
-                          : '自动验收（仅非空检查）'
-                        : '发布者人工验收'}
-                  </dd>
-                </div>
-                <div>
-                  <dt>
-                    <Fingerprint aria-hidden="true" /> 合同 Hash
-                  </dt>
-                  <dd title={pool.contractHash || 'legacy'}>
-                    {pool.contractHash ? `${pool.contractHash.slice(0, 16)}…` : 'legacy'}
+                          ? '按格式检查'
+                          : '结果非空'
+                        : '人工确认'}
                   </dd>
                 </div>
                 <div>
@@ -383,9 +380,9 @@ export function PoolDetailPage() {
                     ) : (
                       <ShieldCheck aria-hidden="true" />
                     )}{' '}
-                    交付目标
+                    结果去向
                   </dt>
-                  <dd>{webhookDelivery ? webhookHostname(webhookUrl) : 'Agent Pool / platform'}</dd>
+                  <dd>{webhookDelivery ? webhookHostname(webhookUrl) : '保存在这里'}</dd>
                 </div>
               </dl>
             </div>
@@ -395,12 +392,11 @@ export function PoolDetailPage() {
             <div className="owner-secret-head">
               <LockKeyhole aria-hidden="true" />
               <div>
-                <strong>Task Capsule / {capsule?.version || 'legacy'}</strong>
+                <strong>任务说明</strong>
               </div>
             </div>
             <p>
-              默认 Runner CLI / UI 不显示或记录任务内容；拥有 root /
-              调试权限的恶意宿主仍可能检查进程或内存。
+              做任务的人在自己电脑上看题目。这个页面默认只给你看进度。
             </p>
             {capsule ? (
               <>
@@ -462,7 +458,7 @@ export function PoolDetailPage() {
         <section className="results-section">
           <div className="result-toolbar">
             <div>
-              <h2>Unit 结果与验收</h2>
+              <h2>任务结果与验收</h2>
             </div>
             <label>
               <span className="sr-only">按状态筛选</span>
@@ -481,11 +477,11 @@ export function PoolDetailPage() {
               </select>
             </label>
           </div>
-          <div className="results-table" role="table" aria-label="Unit 交付结果">
+          <div className="results-table" role="table" aria-label="任务交付结果">
             <div className="results-head" role="row">
-              <span>Unit</span>
+              <span>任务</span>
               <span>状态</span>
-              <span>{webhookDelivery ? '输入 / 外部回执' : '输入 / 交付'}</span>
+              <span>{webhookDelivery ? '输入 / 确认' : '输入 / 结果'}</span>
               <span>执行</span>
               <span>验收</span>
             </div>
@@ -494,7 +490,7 @@ export function PoolDetailPage() {
                 <div className="result-id">
                   <span>{String(resultOffset + index + 1).padStart(4, '0')}</span>
                   <strong>{unit.label || unit.id.slice(0, 8)}</strong>
-                  {unit.isPilot ? <em className="pilot-unit-tag">PILOT</em> : null}
+                  {unit.isPilot ? <em className="pilot-unit-tag">试跑</em> : null}
                   <small>{relativeTime(unit.updatedAt)}</small>
                 </div>
                 <div>
@@ -505,7 +501,7 @@ export function PoolDetailPage() {
                 </div>
                 <details className="result-detail">
                   <summary>
-                    {webhookDelivery ? '查看输入与回执' : '查看输入与结果'}{' '}
+                    {webhookDelivery ? '查看输入和确认' : '查看输入和结果'}{' '}
                     <ChevronDown aria-hidden="true" />
                   </summary>
                   <div>
@@ -514,17 +510,17 @@ export function PoolDetailPage() {
                   </div>
                   {webhookDelivery ? (
                     <div>
-                      <span>外部回执摘要（平台不保存输出）</span>
+                      <span>对方的确认</span>
                       <pre>{resultJson(unit.externalReceipt)}</pre>
                     </div>
                   ) : (
                     <div>
-                      <span>交付</span>
+                      <span>结果</span>
                       <pre>{resultJson(unit.output)}</pre>
                     </div>
                   )}
                   <div className="validation-evidence">
-                    <span>验收证据 · Attempt {unit.attemptCount ?? 0}</span>
+                    <span>检查记录 · 第 {unit.attemptCount ?? 0} 次</span>
                     <pre>
                       {resultJson(
                         unit.validation || {
@@ -581,7 +577,7 @@ export function PoolDetailPage() {
               </article>
             ))}
             {!filteredUnits.length ? (
-              <div className="results-empty">当前筛选条件下还没有 Unit。</div>
+              <div className="results-empty">当前筛选条件下还没有任务。</div>
             ) : null}
           </div>
           {(pool.resultTotal || 0) > 100 ? (
@@ -631,10 +627,9 @@ export function PoolDetailPage() {
             <div className="dialog-icon">
               <Ban aria-hidden="true" />
             </div>
-            <h2 id="cancel-title">取消整个任务池？</h2>
+            <h2 id="cancel-title">取消这批任务？</h2>
             <p>
-              未开始的 Unit 将停止开放领取并解锁 PULSE。已经租用或提交的 Unit
-              会按服务端结算规则处理；该操作无法撤销。
+              还没开始的会停掉并退回积分。已经在做的会按结果结算。取消后不能恢复。
             </p>
             <div className="dialog-actions">
               <button
@@ -650,7 +645,7 @@ export function PoolDetailPage() {
                 disabled={cancelling}
                 onClick={() => void cancel()}
               >
-                {cancelling ? '正在取消…' : '确认取消任务池'}
+                {cancelling ? '正在取消…' : '确认取消'}
               </button>
             </div>
           </section>

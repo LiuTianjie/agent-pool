@@ -90,10 +90,31 @@ export interface OfficialFleetStatus {
   updatedAt: string;
 }
 
+export const INLINE_UNIT_MAX = 20_000;
+export const DATASET_UNIT_MAX = 1_000_000;
+export const REQUIRED_CONCURRENCY_MAX = 10_000;
+export const CLAIM_UNIT_MAX = 20_000;
+
+export const datasetSourceSchema = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('inline') }),
+  z.object({
+    mode: z.literal('https'),
+    url: z
+      .string()
+      .trim()
+      .url()
+      .max(2_048)
+      .refine((value) => value.startsWith('https://'), {
+        message: 'dataset URL must use HTTPS',
+      }),
+  }),
+]);
+export type DatasetSource = z.infer<typeof datasetSourceSchema>;
+
 export const runnerClaimRequestSchema = z.object({
   nodeId: z.string().uuid(),
   poolId: z.string().uuid(),
-  maxUnits: z.number().int().min(1).max(20_000),
+  maxUnits: z.number().int().min(1).max(CLAIM_UNIT_MAX),
   expiresAt: z.string().datetime({ offset: true }).optional(),
 });
 export type RunnerClaimRequest = z.infer<typeof runnerClaimRequestSchema>;
@@ -250,6 +271,11 @@ export const taskUnitDraftSchema = z.object({
   input: z.unknown(),
   expectedOutput: z.unknown().optional(),
 });
+export type TaskUnitDraft = {
+  label?: string;
+  input: unknown;
+  expectedOutput?: unknown;
+};
 
 export const createPoolSchema = z
   .object({
@@ -259,7 +285,7 @@ export const createPoolSchema = z
     secretInstruction: z.string().trim().min(8).max(20_000).optional(),
     requestedAgent: requestedAgentSchema,
     requestedModel: z.string().trim().min(1).max(120),
-    requiredConcurrency: z.number().int().min(1).max(20_000),
+    requiredConcurrency: z.number().int().min(1).max(REQUIRED_CONCURRENCY_MAX),
     maxUnitSeconds: z.number().int().min(10).max(3_600),
     deadlineAt: z.string().datetime({ offset: true }),
     rewardPerUnit: z.number().int().min(1).max(1_000_000),
@@ -269,9 +295,25 @@ export const createPoolSchema = z
     deliveryTarget: deliveryTargetSchema.default({ mode: 'platform' }),
     launchMode: z.enum(['pilot', 'immediate']).default('immediate'),
     pilotUnits: z.number().int().min(1).max(3).default(3),
-    units: z.array(taskUnitDraftSchema).min(2).max(20_000),
+    dataset: datasetSourceSchema.default({ mode: 'inline' }),
+    units: z.array(taskUnitDraftSchema).max(INLINE_UNIT_MAX).optional(),
   })
   .superRefine((value, context) => {
+    if (value.dataset.mode === 'inline') {
+      if (!value.units || value.units.length < 2) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['units'],
+          message: 'inline publish requires at least 2 units',
+        });
+      }
+    } else if (value.units && value.units.length > 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['units'],
+        message: 'https dataset must not include inline units',
+      });
+    }
     if (!value.taskCapsule && !value.secretInstruction) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -314,8 +356,8 @@ export const capacityQuoteRequestSchema = z.object({
   adapter: agentAdapterSchema,
   model: z.string().trim().min(1).max(120),
   deliveryMode: z.enum(['platform', 'webhook']).default('platform'),
-  unitCount: z.number().int().min(1).max(20_000),
-  requiredConcurrency: z.number().int().min(1).max(20_000),
+  unitCount: z.number().int().min(1).max(DATASET_UNIT_MAX),
+  requiredConcurrency: z.number().int().min(1).max(REQUIRED_CONCURRENCY_MAX),
   maxUnitSeconds: z.number().int().min(10).max(3_600),
   deadlineAt: z.string().datetime(),
 });
@@ -370,6 +412,8 @@ export interface PoolSummary {
   pilotFailedUnits: number;
   pilotSubmittedUnits: number;
   contractHash: string;
+  datasetMode: 'inline' | 'https';
+  datasetHost: string | null;
   terminalReason: 'deadline' | 'cancelled_by_publisher' | null;
   createdAt: string;
 }

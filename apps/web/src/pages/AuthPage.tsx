@@ -165,16 +165,16 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           <PoolPass displayName={displayName} connection={connection} />
         ) : (
           <div>
-            <span className="section-index">ACCESS NODE</span>
+            <span className="section-index">登录</span>
             <h1>欢迎回来。</h1>
-            <p>继续查看任务池进度、Agent 状态和 PULSE 流动。</p>
+            <p>继续看任务和积分。</p>
           </div>
         )}
         {!isRegister ? (
           <div className="auth-safety-note">
             <LockKeyhole aria-hidden="true" />
             <span>
-              平台账户与本地 Agent 登录完全分离。我们不会索取 Codex、Claude 或任何模型密钥。
+              登录这个网站，拿不到你的 Codex 或 Claude 密钥。
             </span>
           </div>
         ) : null}
@@ -199,12 +199,12 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                 )}
               </span>
             </div>
-            <span className="section-index">POOL PASS / AP-{networkShortId(displayName)}</span>
-            <h2>{connection === 'connected' ? '节点已点亮。' : '正在接入网络…'}</h2>
+            <span className="section-index">@{networkHandle(displayName)}</span>
+            <h2>{connection === 'connected' ? '已经进来了。' : '正在创建账户…'}</h2>
             <p>
               {connection === 'connected'
-                ? `@${networkHandle(displayName)} 已进入 Agent Pool。`
-                : '正在建立平台身份与 PULSE 账本。'}
+                ? `欢迎，@${networkHandle(displayName)}。`
+                : '正在创建账户…'}
             </p>
             <div className="join-progress" aria-hidden="true">
               <span />
@@ -213,21 +213,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         ) : (
           <form className="auth-form" onSubmit={submit}>
             <div className="form-heading">
-              <span>{isRegister ? `NETWORK ID / 0${registerStep} OF 02` : 'SIGN IN'}</span>
-              <h2>
-                {isRegister
-                  ? registerStep === 1
-                    ? '先给这个身份一个名字'
-                    : '保护你的 Pool Pass'
-                  : '登录 Agent Pool'}
-              </h2>
-              {isRegister ? (
-                <p>
-                  {registerStep === 1
-                    ? '它会即时生成你的网络 Handle 与短 ID。之后仍可在设置中修改显示名称。'
-                    : '只差邮箱与密码。Agent 的本地凭证不会进入这个账户。'}
-                </p>
-              ) : null}
+              {isRegister ? <span>{registerStep} / 2</span> : <h2>登录 Agent Pool</h2>}
             </div>
 
             {isRegister && registerStep === 1 ? (
@@ -268,7 +254,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                   <CheckCircle2 aria-hidden="true" />
                 </span>
                 <span>
-                  <small>NETWORK ID READY</small>
+                  <small>名字已定</small>
                   <strong>@{networkHandle(displayName)}</strong>
                 </span>
                 <button type="button" onClick={() => setRegisterStep(1)}>
@@ -314,7 +300,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
             {isRegister && registerStep === 2 ? (
               <div className="register-security-note">
                 <ShieldCheck aria-hidden="true" />
-                <span>平台账户只管理任务、Runner 授权与 PULSE，不保存模型 Key。</span>
+                <span>这个账户不管你的模型密钥。</span>
               </div>
             ) : null}
 
@@ -331,24 +317,24 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
             >
               {submitting
                 ? isRegister
-                  ? '正在签发 Pool Pass…'
+                  ? '正在创建…'
                   : '正在登录…'
                 : isRegister
                   ? registerStep === 1
-                    ? '确认身份，继续'
-                    : '创建并接入网络'
+                    ? '继续'
+                    : '创建账户'
                   : '登录'}
               {!submitting ? <ArrowRight aria-hidden="true" /> : null}
             </button>
 
             {isRegister && registerStep === 2 ? (
-              <button className="auth-step-back" type="button" onClick={() => setRegisterStep(1)}>
-                <ArrowLeft aria-hidden="true" /> 返回身份
+                <button className="auth-step-back" type="button" onClick={() => setRegisterStep(1)}>
+                <ArrowLeft aria-hidden="true" /> 返回改名字
               </button>
             ) : null}
 
             <p className="auth-switch">
-              {isRegister ? '已有 Pool Pass？' : '还没有账户？'}{' '}
+              {isRegister ? '已有账户？' : '还没有账户？'}{' '}
               <Link to={isRegister ? '/login' : '/register'}>
                 {isRegister ? '直接登录' : '现在注册'}
               </Link>
@@ -357,12 +343,6 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         )}
       </section>
 
-      {isRegister ? (
-        <div className="auth-safety-note auth-safety-note-register">
-          <LockKeyhole aria-hidden="true" />
-          <span>POOL PASS 只是平台身份；本地 Agent 登录与模型密钥始终留在自己的机器。</span>
-        </div>
-      ) : null}
     </main>
   );
 }

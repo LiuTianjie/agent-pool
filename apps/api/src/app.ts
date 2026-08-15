@@ -7,6 +7,7 @@ import Fastify, { type FastifyServerOptions } from 'fastify';
 import { ZodError } from 'zod';
 
 import type { AppConfig } from './config.js';
+import type { DatasetFetch } from './dataset-index.js';
 import { createDatabase, type DbPool } from './db.js';
 import { ApiError } from './errors.js';
 import { registerAuthRoutes } from './routes/auth.js';
@@ -26,6 +27,7 @@ export interface BuildAppOptions {
   config: AppConfig;
   db?: DbPool;
   logger?: FastifyServerOptions['logger'];
+  datasetFetch?: DatasetFetch;
 }
 
 export async function buildApp(options: BuildAppOptions): Promise<App> {
@@ -38,6 +40,7 @@ export async function buildApp(options: BuildAppOptions): Promise<App> {
   const ownsDatabase = !options.db;
   app.decorate('config', options.config);
   app.decorate('db', options.db ?? createDatabase(options.config.databaseUrl));
+  app.decorate('datasetFetch', options.datasetFetch ?? fetch);
 
   await app.register(cookie);
   await app.register(cors, {

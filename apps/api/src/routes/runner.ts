@@ -14,6 +14,7 @@ import { z } from 'zod';
 
 import { ownerAuth, runnerAuth } from '../auth.js';
 import { decryptJson, encryptJson } from '../crypto.js';
+import { fetchDatasetInput } from '../dataset-index.js';
 import { safeInteger, withTransaction } from '../db.js';
 import { ApiError, invariant } from '../errors.js';
 import { withRunnerIdempotentTransaction } from '../idempotency.js';
@@ -565,7 +566,7 @@ export async function registerRunnerRoutes(app: App): Promise<void> {
       'RUNNER_CLAIM_REQUIRED',
       'Runner polling must be scoped to one claimId created by this credential and node',
     );
-    const lease = await withTransaction(app.db, async (client) => {
+    const polled = await withTransaction(app.db, async (client) => {
       const fleetMode = await loadFleetModeForCredential(client, principal);
       const nodeResult = await client.query<{
         id: string;
@@ -597,7 +598,12 @@ export async function registerRunnerRoutes(app: App): Promise<void> {
         requested_model: string;
         reward_per_unit: string;
         secret_instruction_ciphertext: string;
-        input_ciphertext: string;
+        input_ciphertext: string | null;
+        input_sha256: string | null;
+        source_offset: string | null;
+        source_length: number | null;
+        dataset_mode: 'inline' | 'https';
+        dataset_url_ciphertext: string | null;
         output_schema: Record<string, unknown> | null;
         max_unit_seconds: number;
         deadline_at: Date;
@@ -622,7 +628,8 @@ export async function registerRunnerRoutes(app: App): Promise<void> {
       }>(
         `SELECT u.id AS unit_id, p.id AS pool_id, p.category, p.requested_agent,
                 p.requested_model, p.reward_per_unit, p.secret_instruction_ciphertext,
-                u.input_ciphertext, p.output_schema, p.max_unit_seconds, p.deadline_at, p.owner_id,
+                u.input_ciphertext, u.input_sha256, u.source_offset, u.source_length,
+                p.dataset_mode, p.dataset_url_ciphertext, p.output_schema, p.max_unit_seconds, p.deadline_at, p.owner_id,
                 p.title, p.public_summary, p.task_capsule_ciphertext, p.contract_hash,
                 p.delivery_mode, p.delivery_config_ciphertext, p.validation_mode,
                 p.legacy_contract, u.ordinal, u.label_ciphertext, u.is_pilot, u.attempt_count,
@@ -744,7 +751,28 @@ export async function registerRunnerRoutes(app: App): Promise<void> {
               };
             })()
           : ({ mode: 'platform' } as const);
+      const pendingDataset =
+        !unit.input_ciphertext &&
+        unit.dataset_url_ciphertext &&
+        unit.input_sha256 &&
+        unit.source_offset !== null &&
+        unit.source_length
+          ? {
+              url: decryptJson<string>(unit.dataset_url_ciphertext, app.config.encryptionKey),
+              sourceOffset: safeInteger(unit.source_offset),
+              sourceLength: unit.source_length,
+              inputSha256: unit.input_sha256,
+              unitId: unit.unit_id,
+              leaseId,
+              claimId: unit.claim_id,
+            }
+          : null;
+      if (!unit.input_ciphertext) {
+        invariant(pendingDataset, 500, 'DATASET_INDEX_INVALID', 'Dataset unit is missing fetch coordinates');
+      }
       return {
+        pendingDataset,
+        lease: {
         leaseId,
         unitId: unit.unit_id,
         poolId: unit.pool_id,
@@ -756,7 +784,9 @@ export async function registerRunnerRoutes(app: App): Promise<void> {
           unit.secret_instruction_ciphertext,
           app.config.encryptionKey,
         ),
-        input: decryptJson(unit.input_ciphertext, app.config.encryptionKey),
+        input: unit.input_ciphertext
+          ? decryptJson(unit.input_ciphertext, app.config.encryptionKey)
+          : null,
         ...(capsule.delivery.schema ? { outputSchema: capsule.delivery.schema } : {}),
         taskCapsule: capsule,
         contractHash: taskContractHash,
@@ -764,8 +794,38 @@ export async function registerRunnerRoutes(app: App): Promise<void> {
         delivery,
         isPilot: unit.is_pilot,
         expiresAt: updated.rows[0]!.expires_at.toISOString(),
+        },
       };
     });
+    const lease = polled?.lease ?? null;
+    const fetchSpec = polled?.pendingDataset ?? null;
+
+    if (lease && fetchSpec) {
+      try {
+        lease.input = await fetchDatasetInput(fetchSpec.url, fetchSpec, app.datasetFetch);
+      } catch (error) {
+        await withTransaction(app.db, async (client) => {
+          await client.query(
+            `UPDATE task_units
+             SET status = 'queued', lease_id = NULL, leased_runner_id = NULL,
+                 lease_expires_at = NULL, attempt_count = GREATEST(attempt_count - 1, 0),
+                 stage = NULL, progress = 0, updated_at = now()
+             WHERE id = $1 AND lease_id = $2`,
+            [fetchSpec.unitId, fetchSpec.leaseId],
+          );
+          await client.query(`DELETE FROM runner_claim_leases WHERE lease_id = $1`, [
+            fetchSpec.leaseId,
+          ]);
+          await client.query(
+            `UPDATE runner_claim_grants
+             SET claimed_units = GREATEST(claimed_units - 1, 0), updated_at = now()
+             WHERE id = $1 AND claimed_units > 0`,
+            [fetchSpec.claimId],
+          );
+        });
+        throw error;
+      }
+    }
 
     reply.header('Cache-Control', 'no-store, private');
     reply.header('X-Agent-Pool-Content', 'runner-process-only');

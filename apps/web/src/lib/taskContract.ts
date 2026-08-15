@@ -1,10 +1,14 @@
 import type {
   CreatePoolInput,
+  DatasetSource,
   DeliveryTarget as SharedDeliveryTarget,
   TaskAcceptanceNormalization,
   TaskCapsule as SharedTaskCapsule,
 } from '@agent-pool/shared';
+import { INLINE_UNIT_MAX } from '@agent-pool/shared';
 import type { TaskUnitDraft } from './unitTypes';
+
+export { DATASET_UNIT_MAX, INLINE_UNIT_MAX, type DatasetSource } from '@agent-pool/shared';
 
 export const ACCEPTANCE_MODES = [
   'non_empty',
@@ -22,9 +26,13 @@ export type DeliveryFormat = TaskCapsule['delivery']['format'];
 export type DeliveryMode = DeliveryTarget['mode'];
 export type LaunchMode = CreatePoolInput['launchMode'];
 export type AnswerNormalization = TaskAcceptanceNormalization;
-export type CreatePoolWebInput = Omit<CreatePoolInput, 'taskCapsule' | 'deliveryTarget'> & {
+export type CreatePoolWebInput = Omit<
+  CreatePoolInput,
+  'taskCapsule' | 'deliveryTarget' | 'dataset'
+> & {
   taskCapsule: TaskCapsule;
   deliveryTarget: DeliveryTarget;
+  dataset?: CreatePoolInput['dataset'];
 };
 
 export interface TaskExampleDraft {
@@ -104,7 +112,7 @@ export function unitReferenceIssues(units: TaskUnitDraft[]): string[] {
     seen.add(reference);
   }
   const issues: string[] = [];
-  if (missing) issues.push(`${missing} 个 Unit 缺少外部引用 ID`);
+  if (missing) issues.push(`${missing} 条任务缺少外部引用 ID`);
   if (duplicates.size) issues.push(`外部引用 ID 重复：${[...duplicates].slice(0, 3).join('、')}`);
   return issues;
 }
@@ -118,8 +126,8 @@ export function acceptanceChecks(
     return [
       {
         id: 'manual',
-        label: '发布者人工决定',
-        detail: '平台保存交付，等待逐条或批量验收。',
+        label: '人工确认',
+        detail: '你看过结果后再决定。',
         coverage: '人工',
         ready: true,
       },
@@ -129,9 +137,9 @@ export function acceptanceChecks(
     return [
       {
         id: 'receipt',
-        label: 'Webhook 回执签名',
-        detail: '只验证 callback 回执的 HMAC 与摘要，不判断输出质量。',
-        coverage: '每次回执',
+        label: '由你的地址确认',
+        detail: '结果发到你给的地址，由那边确认。',
+        coverage: '每次确认',
         ready: true,
       },
     ];
@@ -141,25 +149,25 @@ export function acceptanceChecks(
     {
       id: 'non_empty',
       label: '结果非空',
-      detail: '只确认有交付内容，不代表答案正确或质量达标。',
-      coverage: '全部 Units',
+      detail: '有内容就算。',
+      coverage: '全部任务',
       ready: true,
     },
   ];
   if (mode === 'schema' || mode === 'schema_and_hidden_exact') {
     checks.push({
       id: 'schema',
-      label: 'JSON Schema',
-      detail: '只检查 JSON 形状、类型与必填字段，不是质量校验。',
-      coverage: '全部 Units',
+      label: '按格式检查',
+      detail: '只看字段对不对。',
+      coverage: '全部任务',
       ready: schemaReady,
     });
   }
   if (mode === 'hidden_exact' || mode === 'schema_and_hidden_exact') {
     checks.push({
       id: 'hidden_exact',
-      label: '隐藏标准结果精确匹配',
-      detail: '结构和值必须严格一致，不进行语义相似度判断。',
+      label: '与预设答案一致',
+      detail: '要和你给的答案一样。',
       coverage: `${coverage.covered}/${coverage.total} · ${coverage.percent}%`,
       ready: coverage.total > 0 && coverage.covered === coverage.total,
     });
@@ -255,6 +263,71 @@ export function isHttpsWebhook(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+export function isHttpsDatasetUrl(value: string): boolean {
+  return isHttpsWebhook(value);
+}
+
+export function inlineUnitLimitMessage(): string {
+  return '粘贴导入的条数超出当前上限，请改用 HTTPS 地址';
+}
+
+export function assertInlineUnitCount(count: number): void {
+  if (count > INLINE_UNIT_MAX) throw new Error(inlineUnitLimitMessage());
+}
+
+export function resolvePublishUnitCount(
+  dataset: DatasetSource,
+  inlineUnits: TaskUnitDraft[],
+  remoteUnitCount: number,
+): number {
+  return dataset.mode === 'https' ? remoteUnitCount : inlineUnits.length;
+}
+
+export function attachPublishDataset(
+  payload: Omit<CreatePoolWebInput, 'dataset' | 'units'>,
+  dataset: DatasetSource,
+  units: TaskUnitDraft[],
+): CreatePoolWebInput {
+  if (dataset.mode === 'https') {
+    return { ...payload, dataset: { mode: 'https', url: dataset.url } };
+  }
+  return { ...payload, dataset: { mode: 'inline' }, units };
+}
+
+export function buildTaskCapsule(input: {
+  goal: string;
+  inputDescription: string;
+  outputDescription: string;
+  constraints: string[];
+  examples: TaskExamplePayload[];
+  format: DeliveryFormat;
+  schema?: Record<string, unknown>;
+  acceptanceMode: AcceptanceMode;
+  criteria: string[];
+  normalization?: AnswerNormalization;
+}): TaskCapsule {
+  const exactMode =
+    input.acceptanceMode === 'hidden_exact' || input.acceptanceMode === 'schema_and_hidden_exact';
+  return {
+    version: 'ap-task/1',
+    goal: input.goal.trim(),
+    inputDescription: input.inputDescription.trim(),
+    outputDescription: input.outputDescription.trim(),
+    constraints: input.constraints,
+    examples: input.examples,
+    delivery: {
+      format: input.format,
+      ...(input.schema ? { schema: input.schema } : {}),
+      maxBytes: 1024 * 1024,
+    },
+    acceptance: {
+      mode: input.acceptanceMode,
+      criteria: input.criteria,
+      ...(exactMode && input.normalization ? { normalization: input.normalization } : {}),
+    },
+  };
 }
 
 export function webhookHostname(value: string): string {
