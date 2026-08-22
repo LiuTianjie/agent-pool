@@ -389,7 +389,7 @@ try {
     ).stdout.trim(),
   );
   assert(
-    Number.isSafeInteger(migrations) && migrations >= 7,
+    Number.isSafeInteger(migrations) && migrations >= 9,
     'Fresh database migrations were incomplete.',
   );
   summary = {

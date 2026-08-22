@@ -125,7 +125,7 @@ export interface RunnerJobTelemetry {
 
 export type OfficialFleetMode = 'standby' | 'offline';
 
-export type RunnerMarketPool = PoolSummary;
+export type RunnerMarketPool = PoolSummary & { owned?: boolean };
 
 export interface OfficialFleetView {
   ownerId: string;
@@ -146,6 +146,7 @@ export interface LedgerEntry {
     | 'topup'
     | 'lock'
     | 'unlock'
+    | 'self_settlement'
     | 'earning_pending'
     | 'earning_settled'
     | 'withdrawal'

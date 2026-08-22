@@ -59,9 +59,7 @@ export function PoolCard({ pool }: { pool: PoolSummary }) {
         <span>
           <Clock3 aria-hidden="true" /> 截止 {dateTime(pool.deadlineAt)}
         </span>
-        <span className="pool-pulse-reward">
-          {credits(pool.rewardPerUnit)} / 条
-        </span>
+        <span className="pool-pulse-reward">{credits(pool.rewardPerUnit)} / 条</span>
         <ArrowUpRight aria-hidden="true" />
       </footer>
     </Link>

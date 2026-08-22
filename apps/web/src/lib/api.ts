@@ -1,4 +1,10 @@
-import type { CapacityQuote, LiveEvent, PoolSummary, TaskCapsule, WalletSummary } from '@agent-pool/shared';
+import type {
+  CapacityQuote,
+  LiveEvent,
+  PoolSummary,
+  TaskCapsule,
+  WalletSummary,
+} from '@agent-pool/shared';
 import type { CreatePoolWebInput, DeliveryTarget } from './taskContract';
 import type {
   CapacityCatalogItem,
@@ -267,6 +273,7 @@ function ledgerKind(kind: string): LedgerEntry['kind'] {
   if (kind === 'unit_settlement') return 'earning_pending';
   if (kind === 'earning_release') return 'earning_settled';
   if (kind === 'dev_withdrawal') return 'withdrawal';
+  if (kind === 'self_settlement') return 'self_settlement';
   return 'adjustment';
 }
 
@@ -278,6 +285,7 @@ function ledgerDescription(row: RawLedgerEntry): string {
     earning_release: '收益释放为可提现积分',
     dev_withdrawal: '开发态模拟提现',
     pool_refund: '未执行任务预算退回',
+    self_settlement: '自己跑完，积分已消耗、不计入收益',
   };
   return labels[row.kind] || row.kind.replaceAll('_', ' ');
 }
@@ -324,7 +332,28 @@ export interface ValidatePoolResult {
   valid: true;
   totalUnits: number;
   totalCost: number;
-  dataset: { mode: 'inline' } | { mode: 'https'; url: string; host: string };
+  dataset:
+    | { mode: 'inline' }
+    | { mode: 'https'; url: string; host: string }
+    | {
+        mode: 'work';
+        url: string;
+        host: string;
+        packageHost?: string;
+        answersHost?: string | null;
+      };
+  workPackage?: {
+    title: string;
+    category: string;
+    publicSummary: string;
+    adapter: string;
+    model: string;
+    urlHost: string;
+    unitsHost: string;
+    answersHost: string | null;
+    acceptance: string;
+  };
+  taskCapsule?: TaskCapsule;
   capacityQuote?: CapacityQuote;
 }
 
@@ -394,7 +423,7 @@ export const api = {
   dashboard: async (): Promise<DashboardData> => {
     const [dashboard, pools, pulse] = await Promise.all([
       request<DashboardEnvelope>('/dashboard'),
-      request<PoolListEnvelope>('/pools?limit=30&offset=0'),
+      request<PoolListEnvelope>('/pools?limit=100&offset=0'),
       request<NetworkPulseEnvelope>('/network/pulse'),
     ]);
     return {
@@ -489,6 +518,20 @@ export const api = {
       withdrawalId: result.withdrawal.id,
     };
   },
+
+  createNodeClaim: async (nodeId: string, input: { poolId: string; maxUnits: number }) =>
+    request<{
+      claim: {
+        id: string;
+        poolId: string;
+        nodeId: string;
+        maxUnits: number;
+        remainingUnits: number;
+        expiresAt: string;
+        status: string;
+      };
+      executeCommand: string;
+    }>(`/runners/${encodeURIComponent(nodeId)}/claims`, json('POST', input)),
 
   runners: async (): Promise<RunnerNodePublic[]> => {
     const { nodes } = await request<RunnersEnvelope>('/runners');

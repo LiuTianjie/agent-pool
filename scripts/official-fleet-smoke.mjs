@@ -495,7 +495,7 @@ try {
   );
   const migrationCount = Number(migrations.stdout.trim());
   assert(
-    Number.isSafeInteger(migrationCount) && migrationCount >= 5,
+    Number.isSafeInteger(migrationCount) && migrationCount >= 9,
     'Fresh database migrations were incomplete.',
   );
 

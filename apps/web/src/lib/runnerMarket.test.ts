@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { RunnerMarketPool, RunnerNodePublic } from './types';
-import { runnerClaimCommand, runnerMatchesPool, runnerPickCommand } from './runnerMarket';
+import {
+  mergeMarketPools,
+  runnerClaimCommand,
+  runnerMatchesPool,
+  runnerPickCommand,
+  runnerResumeCommand,
+} from './runnerMarket';
 
 const NOW = Date.parse('2026-08-14T10:00:00.000Z');
 
@@ -104,5 +110,24 @@ describe('runner claim market', () => {
     expect(runnerPickCommand(node({ operatorType: 'official' }), pool())).toBe(
       'agentpool-official pick',
     );
+    expect(runnerResumeCommand(node(), '30000000-0000-4000-8000-000000000001')).toBe(
+      'agentpool claim --claim 30000000-0000-4000-8000-000000000001',
+    );
+    expect(
+      runnerResumeCommand(
+        node({ operatorType: 'official' }),
+        '30000000-0000-4000-8000-000000000001',
+        'webhook',
+      ),
+    ).toBe('agentpool-official claim --claim 30000000-0000-4000-8000-000000000001');
+  });
+
+  it('surfaces owned pools first so a publisher can finish their own loop', () => {
+    const owned = pool({ id: '20000000-0000-4000-8000-000000000099', title: 'Mine' });
+    const other = pool({ title: 'Other' });
+    expect(mergeMarketPools([other], [owned])).toEqual([
+      { ...owned, owned: true },
+      { ...other, owned: false },
+    ]);
   });
 });

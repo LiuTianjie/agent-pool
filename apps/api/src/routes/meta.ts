@@ -531,17 +531,7 @@ const createPoolJsonSchema = {
   title: 'Create Agent Pool task batch',
   type: 'object',
   additionalProperties: false,
-  required: [
-    'title',
-    'category',
-    'publicSummary',
-    'requestedAgent',
-    'requestedModel',
-    'requiredConcurrency',
-    'maxUnitSeconds',
-    'deadlineAt',
-    'rewardPerUnit',
-  ],
+  required: ['requiredConcurrency', 'maxUnitSeconds', 'deadlineAt', 'rewardPerUnit'],
   properties: {
     title: { type: 'string', minLength: 3, maxLength: 120 },
     category: { enum: TASK_CATEGORIES },
@@ -598,6 +588,15 @@ const createPoolJsonSchema = {
             url: { type: 'string', format: 'uri', maxLength: 2_048 },
           },
         },
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['mode', 'url'],
+          properties: {
+            mode: { const: 'work' },
+            url: { type: 'string', format: 'uri', maxLength: 2_048 },
+          },
+        },
       ],
     },
     units: {
@@ -616,7 +615,22 @@ const createPoolJsonSchema = {
       },
     },
   },
-  anyOf: [{ required: ['taskCapsule'] }, { required: ['secretInstruction'] }],
+  anyOf: [
+    {
+      required: ['dataset'],
+      properties: {
+        dataset: {
+          type: 'object',
+          required: ['mode', 'url'],
+          properties: { mode: { const: 'work' } },
+        },
+      },
+    },
+    {
+      required: ['title', 'category', 'publicSummary', 'requestedAgent', 'requestedModel'],
+      anyOf: [{ required: ['taskCapsule'] }, { required: ['secretInstruction'] }],
+    },
+  ],
   $defs: {
     taskCapsule: {
       type: 'object',

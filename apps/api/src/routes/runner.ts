@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 import {
+  CLAIM_UNIT_MAX,
   agentAdapterSchema,
   type OfficialFleetMode,
   runnerProgressSchema,
@@ -14,12 +15,13 @@ import { z } from 'zod';
 
 import { ownerAuth, runnerAuth } from '../auth.js';
 import { decryptJson, encryptJson } from '../crypto.js';
-import { fetchDatasetInput } from '../dataset-index.js';
+import { fetchDatasetExpected, fetchDatasetInput, fetchDatasetUnitLine } from '../dataset-index.js';
 import { safeInteger, withTransaction } from '../db.js';
 import { ApiError, invariant } from '../errors.js';
 import { withRunnerIdempotentTransaction } from '../idempotency.js';
 import { hashOpaqueToken } from '../security.js';
 import {
+  createOwnerBoundClaim,
   createRunnerClaimInTransaction,
   getRunnerClaim,
   listRunnerClaims,
@@ -602,7 +604,7 @@ export async function registerRunnerRoutes(app: App): Promise<void> {
         input_sha256: string | null;
         source_offset: string | null;
         source_length: number | null;
-        dataset_mode: 'inline' | 'https';
+        dataset_mode: 'inline' | 'https' | 'work';
         dataset_url_ciphertext: string | null;
         output_schema: Record<string, unknown> | null;
         max_unit_seconds: number;
@@ -646,7 +648,7 @@ export async function registerRunnerRoutes(app: App): Promise<void> {
            ON cap.node_id = $1 AND cap.adapter = p.requested_agent
           AND p.requested_model = ANY(cap.supported_models)
          JOIN runner_claim_grants claim_grant
-           ON claim_grant.id = $8::uuid AND claim_grant.credential_id = $9
+           ON claim_grant.id = $7::uuid AND claim_grant.credential_id = $8
           AND claim_grant.node_id = $1 AND claim_grant.pool_id = p.id
           AND claim_grant.revoked_at IS NULL
           AND claim_grant.expires_at > now()
@@ -659,8 +661,7 @@ export async function registerRunnerRoutes(app: App): Promise<void> {
          WHERE u.status = 'queued'
            AND p.status IN ('piloting', 'waiting_capacity', 'queued', 'running')
            AND p.deadline_at > now()
-           AND p.owner_id <> $6
-           AND (p.delivery_mode <> 'webhook' OR $7::boolean)
+           AND (p.delivery_mode <> 'webhook' OR $6::boolean)
            AND ($2::text[] IS NULL OR p.category = ANY($2::text[]))
            AND ($4::text IS NULL OR p.requested_agent = $4)
            AND ($5::text[] IS NULL OR p.requested_model = ANY($5::text[]))
@@ -679,7 +680,6 @@ export async function registerRunnerRoutes(app: App): Promise<void> {
           node.max_concurrency,
           input.adapter ?? null,
           input.models ?? null,
-          node.owner_id,
           node.supports_direct_webhooks,
           input.claimId,
           principal.credentialId,
@@ -768,32 +768,37 @@ export async function registerRunnerRoutes(app: App): Promise<void> {
             }
           : null;
       if (!unit.input_ciphertext) {
-        invariant(pendingDataset, 500, 'DATASET_INDEX_INVALID', 'Dataset unit is missing fetch coordinates');
+        invariant(
+          pendingDataset,
+          500,
+          'DATASET_INDEX_INVALID',
+          'Dataset unit is missing fetch coordinates',
+        );
       }
       return {
         pendingDataset,
         lease: {
-        leaseId,
-        unitId: unit.unit_id,
-        poolId: unit.pool_id,
-        category: unit.category,
-        requestedAgent: unit.requested_agent,
-        requestedModel: unit.requested_model,
-        reward: safeInteger(unit.reward_per_unit),
-        instruction: decryptJson<string>(
-          unit.secret_instruction_ciphertext,
-          app.config.encryptionKey,
-        ),
-        input: unit.input_ciphertext
-          ? decryptJson(unit.input_ciphertext, app.config.encryptionKey)
-          : null,
-        ...(capsule.delivery.schema ? { outputSchema: capsule.delivery.schema } : {}),
-        taskCapsule: capsule,
-        contractHash: taskContractHash,
-        ...(attemptFeedback ? { attemptFeedback } : {}),
-        delivery,
-        isPilot: unit.is_pilot,
-        expiresAt: updated.rows[0]!.expires_at.toISOString(),
+          leaseId,
+          unitId: unit.unit_id,
+          poolId: unit.pool_id,
+          category: unit.category,
+          requestedAgent: unit.requested_agent,
+          requestedModel: unit.requested_model,
+          reward: safeInteger(unit.reward_per_unit),
+          instruction: decryptJson<string>(
+            unit.secret_instruction_ciphertext,
+            app.config.encryptionKey,
+          ),
+          input: unit.input_ciphertext
+            ? decryptJson(unit.input_ciphertext, app.config.encryptionKey)
+            : null,
+          ...(capsule.delivery.schema ? { outputSchema: capsule.delivery.schema } : {}),
+          taskCapsule: capsule,
+          contractHash: taskContractHash,
+          ...(attemptFeedback ? { attemptFeedback } : {}),
+          delivery,
+          isPilot: unit.is_pilot,
+          expiresAt: updated.rows[0]!.expires_at.toISOString(),
         },
       };
     });
@@ -946,9 +951,7 @@ export async function registerRunnerRoutes(app: App): Promise<void> {
           'Webhook leases must be completed with a signed receipt',
         );
 
-        const expected = row.expected_output_ciphertext
-          ? decryptJson(row.expected_output_ciphertext, app.config.encryptionKey)
-          : undefined;
+        const expected = await resolveExpectedOutput(app, row);
         const capsule = taskCapsuleFromPoolRow(row, app.config.encryptionKey);
         const validation = row.legacy_contract
           ? validateTaskResult(input.result, row.output_schema, expected, row.pool_id)
@@ -1545,6 +1548,32 @@ export async function registerRunnerRoutes(app: App): Promise<void> {
     return summaries[0];
   });
 
+  app.post(
+    '/api/runners/:nodeId/claims',
+    { preHandler: ownerAuth(app, 'pools:write') },
+    async (request, reply) => {
+      const { nodeId } = z.object({ nodeId: z.string().uuid() }).parse(request.params);
+      const input = z
+        .object({
+          poolId: z.string().uuid(),
+          maxUnits: z.number().int().min(1).max(CLAIM_UNIT_MAX),
+        })
+        .parse(request.body);
+      const claim = await createOwnerBoundClaim(app, request.authUser!.id, {
+        nodeId,
+        poolId: input.poolId,
+        maxUnits: input.maxUnits,
+      });
+      return reply.code(201).send({
+        claim,
+        executeCommand:
+          claim.deliveryMode === 'webhook'
+            ? `agentpool claim --claim ${claim.id} --allow-webhooks`
+            : `agentpool claim --claim ${claim.id}`,
+      });
+    },
+  );
+
   app.get('/api/runners', { preHandler: ownerAuth(app, 'runners:read') }, async (request) => {
     const nodes = await app.db.query<{
       id: string;
@@ -1703,6 +1732,14 @@ type LeaseRow = {
   stage: string | null;
   progress: number;
   expected_output_ciphertext: string | null;
+  dataset_url_ciphertext: string | null;
+  answers_url_ciphertext: string | null;
+  input_sha256: string | null;
+  source_offset: string | null;
+  source_length: number | null;
+  answer_sha256: string | null;
+  answer_offset: string | null;
+  answer_length: number | null;
   output_schema: Record<string, unknown> | null;
   validation_mode: string;
   attempt_count: number;
@@ -1728,6 +1765,8 @@ async function loadLeaseForUpdate(
   return typedClient.query<LeaseRow>(
     `SELECT u.id AS unit_id, u.pool_id, p.owner_id AS publisher_id, n.credential_id,
             u.status, u.lease_expires_at, u.stage, u.progress, u.expected_output_ciphertext,
+            p.dataset_url_ciphertext, p.answers_url_ciphertext, u.input_sha256,
+            u.source_offset, u.source_length, u.answer_sha256, u.answer_offset, u.answer_length,
             p.output_schema, p.validation_mode, u.attempt_count, p.max_attempts,
             p.deadline_at, p.status AS pool_status, p.reward_per_unit, p.title,
             p.public_summary, p.secret_instruction_ciphertext, p.task_capsule_ciphertext,
@@ -1737,6 +1776,46 @@ async function loadLeaseForUpdate(
      WHERE u.lease_id = $1 FOR UPDATE OF u, p`,
     [leaseId],
   );
+}
+
+async function resolveExpectedOutput(app: App, row: LeaseRow): Promise<unknown> {
+  if (row.expected_output_ciphertext) {
+    return decryptJson(row.expected_output_ciphertext, app.config.encryptionKey);
+  }
+  if (
+    row.answers_url_ciphertext &&
+    row.answer_sha256 &&
+    row.answer_offset !== null &&
+    row.answer_length
+  ) {
+    return fetchDatasetExpected(
+      decryptJson<string>(row.answers_url_ciphertext, app.config.encryptionKey),
+      {
+        sourceOffset: safeInteger(row.answer_offset),
+        sourceLength: row.answer_length,
+        expectedSha256: row.answer_sha256,
+      },
+      app.datasetFetch,
+    );
+  }
+  if (
+    row.dataset_url_ciphertext &&
+    row.input_sha256 &&
+    row.source_offset !== null &&
+    row.source_length
+  ) {
+    const line = await fetchDatasetUnitLine(
+      decryptJson<string>(row.dataset_url_ciphertext, app.config.encryptionKey),
+      {
+        sourceOffset: safeInteger(row.source_offset),
+        sourceLength: row.source_length,
+        inputSha256: row.input_sha256,
+      },
+      app.datasetFetch,
+    );
+    return line.expectedOutput;
+  }
+  return undefined;
 }
 
 async function recordSubmissionEvents(

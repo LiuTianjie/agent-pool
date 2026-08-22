@@ -114,14 +114,25 @@ export function validateTaskContractInput(
     ['hidden_exact', 'schema_and_hidden_exact'].includes(capsule.acceptance.mode)
   ) {
     invariant(
-      units.length > 0 && units.every((unit) => unit.expectedOutput !== undefined),
+      units.length > 0 &&
+        units.every(
+          (unit) =>
+            unit.expectedOutput !== undefined ||
+            (typeof (unit as { answerSha256?: unknown }).answerSha256 === 'string' &&
+              (unit as { answerSha256?: string }).answerSha256),
+        ),
       400,
       'EXPECTED_OUTPUT_REQUIRED',
-      'Every unit requires expectedOutput for hidden exact acceptance',
+      'Every unit requires a hosted answer or expectedOutput for hidden exact acceptance',
     );
     if (capsule.delivery.format === 'text') {
       invariant(
-        units.every((unit) => typeof unit.expectedOutput === 'string'),
+        units.every(
+          (unit) =>
+            typeof unit.expectedOutput === 'string' ||
+            (unit.expectedOutput === undefined &&
+              typeof (unit as { answerSha256?: string }).answerSha256 === 'string'),
+        ),
         400,
         'TEXT_EXPECTED_OUTPUT_INVALID',
         'Text delivery requires string expectedOutput values',
@@ -167,13 +178,19 @@ export function validatePublicHttpsUrl(raw: string, kind: 'webhook' | 'dataset')
   } catch {
     invariant(false, 400, code, `${label} is invalid`);
   }
-  invariant(url.protocol === 'https:', 400, code, `${label} must use HTTPS`);
   invariant(!url.username && !url.password, 400, code, `${label} must not contain credentials`);
   invariant(!url.hash, 400, code, `${label} must not contain a fragment`);
   const hostname = url.hostname
     .toLowerCase()
     .replace(/^\[|\]$/g, '')
     .replace(/\.$/, '');
+  const allowDevLoopback =
+    process.env.NODE_ENV !== 'production' &&
+    kind === 'dataset' &&
+    (url.protocol === 'http:' || url.protocol === 'https:') &&
+    (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1');
+  if (allowDevLoopback) return;
+  invariant(url.protocol === 'https:', 400, code, `${label} must use HTTPS`);
   invariant(
     hostname !== 'localhost' &&
       !hostname.endsWith('.localhost') &&

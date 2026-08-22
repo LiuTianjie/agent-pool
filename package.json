@@ -13,6 +13,7 @@
     "smoke:live": "node scripts/live-smoke.mjs",
     "smoke:control-local": "node scripts/control-smoke.mjs",
     "smoke:official-local": "node scripts/official-fleet-smoke.mjs",
+    "loop:local": "node scripts/local-loop.mjs",
     "test": "pnpm --filter @agent-pool/shared build && pnpm -r test",
     "typecheck": "pnpm --filter @agent-pool/shared build && pnpm -r typecheck",
     "lint": "pnpm --filter @agent-pool/shared build && pnpm -r lint",

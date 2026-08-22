@@ -199,9 +199,7 @@ export function SettingsPage() {
               </span>
             </div>
           </div>
-          <p className="settings-note">
-            代你操作的工具只能做你批准过的事，拿不到模型密钥。
-          </p>
+          <p className="settings-note">代你操作的工具只能做你批准过的事，拿不到模型密钥。</p>
         </section>
 
         <section className="settings-card control-credentials-card">

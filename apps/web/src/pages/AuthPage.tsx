@@ -18,6 +18,7 @@ import { Brand } from '../components/Brand';
 import { useAuth } from '../context/AuthContext';
 import { ApiError } from '../lib/api';
 import { identitySignal, networkHandle, networkShortId } from '../lib/identity';
+import { safeAppPath } from '../lib/navigation';
 
 type RegisterStep = 1 | 2;
 type ConnectionState = 'idle' | 'connecting' | 'connected';
@@ -115,6 +116,10 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const nextPath =
+    safeAppPath(new URLSearchParams(location.search).get('next')) ||
+    safeAppPath((location.state as { from?: string } | null)?.from) ||
+    '/app';
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -139,11 +144,10 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         setConnection('connected');
         await wait(reducedMotion ? 20 : 220);
         setUser(user);
-        navigate('/app', { replace: true });
+        navigate(nextPath, { replace: true });
       } else {
         await login(email, password);
-        const from = (location.state as { from?: string } | null)?.from;
-        navigate(from || '/app', { replace: true });
+        navigate(nextPath, { replace: true });
       }
     } catch (requestError) {
       setConnection('idle');
@@ -173,9 +177,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         {!isRegister ? (
           <div className="auth-safety-note">
             <LockKeyhole aria-hidden="true" />
-            <span>
-              登录这个网站，拿不到你的 Codex 或 Claude 密钥。
-            </span>
+            <span>登录这个网站，拿不到你的 Codex 或 Claude 密钥。</span>
           </div>
         ) : null}
       </section>
@@ -328,21 +330,20 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
             </button>
 
             {isRegister && registerStep === 2 ? (
-                <button className="auth-step-back" type="button" onClick={() => setRegisterStep(1)}>
+              <button className="auth-step-back" type="button" onClick={() => setRegisterStep(1)}>
                 <ArrowLeft aria-hidden="true" /> 返回改名字
               </button>
             ) : null}
 
             <p className="auth-switch">
               {isRegister ? '已有账户？' : '还没有账户？'}{' '}
-              <Link to={isRegister ? '/login' : '/register'}>
+              <Link to={isRegister ? `/login${location.search}` : `/register${location.search}`}>
                 {isRegister ? '直接登录' : '现在注册'}
               </Link>
             </p>
           </form>
         )}
       </section>
-
     </main>
   );
 }

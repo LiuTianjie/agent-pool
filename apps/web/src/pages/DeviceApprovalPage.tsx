@@ -163,13 +163,9 @@ export function DeviceApprovalPage() {
             </span>
             <h1>{approvalResult.kind === 'control' ? '控制 Agent 已连接' : '设备已连接'}</h1>
             {approvalResult.kind === 'control' ? (
-              <p>
-                {approvalResult.label} 只能做刚才列出的事。之后可以在设置里关掉。
-              </p>
+              <p>{approvalResult.label} 只能做刚才列出的事。之后可以在设置里关掉。</p>
             ) : (
-              <p>
-                {approvalResult.label} 已连上。可以回到终端继续。
-              </p>
+              <p>{approvalResult.label} 已连上。可以回到终端继续。</p>
             )}
             <Link
               className="button button-primary"

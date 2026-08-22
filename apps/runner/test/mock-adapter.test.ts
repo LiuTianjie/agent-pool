@@ -29,4 +29,27 @@ describe('MockAdapter', () => {
       length: 7,
     });
   });
+
+  it('solves a simple hosted arithmetic expression for local demos', async () => {
+    const lease: LeasePayload = {
+      leaseId: 'lease',
+      unitId: 'unit',
+      poolId: 'pool',
+      category: 'math',
+      requestedAgent: 'mock',
+      requestedModel: 'mock-v1',
+      reward: 0,
+      instruction: 'solve',
+      input: { expression: '9*3' },
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    await expect(
+      new MockAdapter().run({
+        lease,
+        taskDirectory: '/unused',
+        signal: new AbortController().signal,
+        onProgress: () => undefined,
+      }),
+    ).resolves.toEqual({ answer: '27' });
+  });
 });

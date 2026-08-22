@@ -4,6 +4,7 @@ import {
   Ban,
   Boxes,
   Check,
+  RadioTower,
   CheckCircle2,
   ChevronDown,
   Clock3,
@@ -220,6 +221,11 @@ export function PoolDetailPage() {
         </div>
         <div className="page-actions">
           <LiveStatus state={state} />
+          {canCancel ? (
+            <Link className="button button-primary button-small" to="/app/run">
+              <RadioTower aria-hidden="true" /> 去领取
+            </Link>
+          ) : null}
           <button
             className="button button-outline button-small"
             type="button"
@@ -348,9 +354,7 @@ export function PoolDetailPage() {
                   <dt>
                     <Boxes aria-hidden="true" /> 单条奖励
                   </dt>
-                  <dd className="contract-pulse">
-                    {credits(pool.rewardPerUnit)}
-                  </dd>
+                  <dd className="contract-pulse">{credits(pool.rewardPerUnit)}</dd>
                 </div>
                 <div>
                   <dt>
@@ -382,7 +386,19 @@ export function PoolDetailPage() {
                     )}{' '}
                     结果去向
                   </dt>
-                  <dd>{webhookDelivery ? webhookHostname(webhookUrl) : '保存在这里'}</dd>
+                  <dd>{webhookDelivery ? webhookHostname(webhookUrl) : '按契约验收'}</dd>
+                </div>
+                <div>
+                  <dt>
+                    <LockKeyhole aria-hidden="true" /> 数据
+                  </dt>
+                  <dd>
+                    {pool.datasetMode === 'work'
+                      ? '工作包托管'
+                      : pool.datasetMode === 'https'
+                        ? 'JSONL 托管'
+                        : '粘贴在平台内'}
+                  </dd>
                 </div>
               </dl>
             </div>
@@ -395,9 +411,7 @@ export function PoolDetailPage() {
                 <strong>任务说明</strong>
               </div>
             </div>
-            <p>
-              做任务的人在自己电脑上看题目。这个页面默认只给你看进度。
-            </p>
+            <p>做任务的人在自己电脑上看题目。这个页面默认只给你看进度。</p>
             {capsule ? (
               <>
                 <div className="capsule-detail-summary">
@@ -628,9 +642,7 @@ export function PoolDetailPage() {
               <Ban aria-hidden="true" />
             </div>
             <h2 id="cancel-title">取消这批任务？</h2>
-            <p>
-              还没开始的会停掉并退回积分。已经在做的会按结果结算。取消后不能恢复。
-            </p>
+            <p>还没开始的会停掉并退回积分。已经在做的会按结果结算。取消后不能恢复。</p>
             <div className="dialog-actions">
               <button
                 className="button button-quiet"

@@ -1,5 +1,5 @@
 import type { LiveEvent } from '@agent-pool/shared';
-import { ArrowRight, Blocks, Plus, RadioTower, Sparkles } from 'lucide-react';
+import { ArrowRight, Plus, RadioTower, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { EmptyState, InlineError, LoadingState } from '../components/LoadingState';
@@ -55,63 +55,77 @@ export function DashboardPage() {
   const activePools = data.pools.filter((pool) =>
     ['piloting', 'waiting_capacity', 'queued', 'running', 'paused'].includes(pool.status),
   );
+  const recentPools = data.pools
+    .filter((pool) => ['completed', 'cancelled'].includes(pool.status))
+    .slice(0, 6);
 
   return (
     <div className="page dashboard-page">
       <PageHeader
         eyebrow="控制台"
-        title={`${user?.displayName || '你好'}，任务正在进行。`}
-        description="发布任务，或看正在做的进度。"
+        title={
+          activePools.length
+            ? `${user?.displayName || '你好'}，任务正在进行。`
+            : `${user?.displayName || '你好'}，可以从这里发出去。`
+        }
+        description="发布一批托管任务，或用自己的 Agent 先跑通。"
         actions={<LiveStatus state={state} />}
       />
 
       <WalletGrid wallet={data.wallet} variant={activePools.length ? 'grid' : 'strip'} />
 
-      {activePools.length ? (
-        <section className="dashboard-band">
-          <div className="network-pulse-card">
-            <div className="pulse-orbit" aria-hidden="true">
-              <span />
-              <span />
-              <RadioTower />
+      <section className="dashboard-band">
+        <div className="network-pulse-card">
+          <div className="pulse-orbit" aria-hidden="true">
+            <span />
+            <span />
+            <RadioTower />
+          </div>
+          <div>
+            <strong>{data.network.onlineNodes.toLocaleString('zh-CN')}</strong>
+            <p>
+              个 Runner 节点在线，其中 {data.network.busyNodes.toLocaleString('zh-CN')} 个正在执行。
+            </p>
+          </div>
+          <dl>
+            <div>
+              <dt>进行中的任务</dt>
+              <dd>{data.network.activePools.toLocaleString('zh-CN')}</dd>
             </div>
             <div>
-              <strong>{data.network.onlineNodes.toLocaleString('zh-CN')}</strong>
-              <p>
-                个 Runner 节点在线，其中 {data.network.busyNodes.toLocaleString('zh-CN')}{' '}
-                个正在执行。
-              </p>
+              <dt>等待中的任务</dt>
+              <dd>{data.network.queuedUnits.toLocaleString('zh-CN')}</dd>
             </div>
-            <dl>
-              <div>
-                <dt>进行中的任务</dt>
-                <dd>{data.network.activePools.toLocaleString('zh-CN')}</dd>
-              </div>
-              <div>
-                <dt>等待中的任务</dt>
-                <dd>{data.network.queuedUnits.toLocaleString('zh-CN')}</dd>
-              </div>
-              <div>
-                <dt>今日完成</dt>
-                <dd>{data.network.completedToday.toLocaleString('zh-CN')}</dd>
-              </div>
-            </dl>
-          </div>
+            <div>
+              <dt>今日完成</dt>
+              <dd>{data.network.completedToday.toLocaleString('zh-CN')}</dd>
+            </div>
+          </dl>
+        </div>
 
-          <div className="quick-actions">
-            <Link to="/app/pools/new">
-              <span className="quick-icon">
-                <Plus aria-hidden="true" />
-              </span>
-              <div>
-                <strong>发布一批任务</strong>
-                <small>写说明，放上数据</small>
-              </div>
-              <ArrowRight aria-hidden="true" />
-            </Link>
-          </div>
-        </section>
-      ) : null}
+        <div className="quick-actions">
+          <Link to="/app/pools/new">
+            <span className="quick-icon">
+              <Plus aria-hidden="true" />
+            </span>
+            <div>
+              <strong>发布一批任务</strong>
+              <small>指向你托管的工作包</small>
+            </div>
+            <ArrowRight aria-hidden="true" />
+          </Link>
+          <Link to="/app/run">
+            <span className="quick-icon">
+              <RadioTower aria-hidden="true" />
+            </span>
+            <div>
+              <strong>用 Agent 接活</strong>
+              <small>生成领取单，本机执行</small>
+            </div>
+            <ArrowRight aria-hidden="true" />
+          </Link>
+        </div>
+      </section>
 
       <section className="page-section">
         <div className="section-bar">
@@ -126,25 +140,36 @@ export function DashboardPage() {
               <PoolCard key={pool.id} pool={pool} />
             ))}
           </div>
+        ) : recentPools.length ? (
+          <p className="dashboard-quiet">现在没有进行中的。最近完成的在下面。</p>
         ) : (
           <EmptyState
             title="现在还没有进行中的任务"
-            detail="发布一组能拆开做的小任务。"
-            action={
-              <Link className="button button-primary" to="/app/pools/new">
-                <Blocks aria-hidden="true" /> 发布一批任务
-              </Link>
-            }
+            detail="上面可以直接发布一批，或用自己的 Agent 先跑通。"
           />
         )}
       </section>
 
-      {activePools.length ? (
-        <aside className="privacy-strip">
-          <Sparkles aria-hidden="true" />
-          <span>进度里看不到题目和答案。</span>
-        </aside>
+      {recentPools.length ? (
+        <section className="page-section">
+          <div className="section-bar">
+            <div>
+              <h2>最近完成</h2>
+            </div>
+            <span>{recentPools.length} 批</span>
+          </div>
+          <div className="pool-list">
+            {recentPools.map((pool) => (
+              <PoolCard key={pool.id} pool={pool} />
+            ))}
+          </div>
+        </section>
       ) : null}
+
+      <aside className="privacy-strip">
+        <Sparkles aria-hidden="true" />
+        <span>进度里看不到题目和答案。托管正文也不进平台库。</span>
+      </aside>
     </div>
   );
 }

@@ -1,0 +1,28 @@
+{
+  "version": "ap-work/1",
+  "title": "本地演示：四则运算",
+  "publicSummary": "四道算术题。题目和答案都在本机示例文件里，用来跑通发布、领取和验收。",
+  "category": "math",
+  "execution": {
+    "adapter": "mock",
+    "model": "mock-v1"
+  },
+  "task": {
+    "version": "ap-task/1",
+    "goal": "给出每个表达式的结果",
+    "inputDescription": "一个 JSON 对象，包含 expression",
+    "outputDescription": "一个 JSON 对象，包含 answer",
+    "constraints": ["只返回 JSON", "不要解释"],
+    "examples": [
+      {
+        "input": { "expression": "1+1" },
+        "output": { "answer": "2" }
+      }
+    ],
+    "delivery": { "format": "json", "maxBytes": 2048 },
+    "acceptance": { "mode": "hidden_exact", "criteria": ["exact"] }
+  },
+  "units": { "url": "./units.jsonl" },
+  "answers": { "url": "./answers.jsonl" },
+  "delivery": { "mode": "platform" }
+}

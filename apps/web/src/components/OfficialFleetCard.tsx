@@ -180,9 +180,7 @@ export function OfficialFleetCard({
               ))}
             </div>
           ) : (
-            <p className="official-nodes-empty">
-              现在还没有官方机器连上来。
-            </p>
+            <p className="official-nodes-empty">现在还没有官方机器连上来。</p>
           )}
         </div>
 
@@ -209,9 +207,7 @@ export function OfficialFleetCard({
           </div>
           <p>
             <AlertTriangle aria-hidden="true" />
-            <span>
-              官方节点用平台自己的模型通道，任务内容会经过这些机器。
-            </span>
+            <span>官方节点用平台自己的模型通道，任务内容会经过这些机器。</span>
           </p>
         </aside>
       </div>

@@ -9,6 +9,7 @@ import {
   inlineUnitLimitMessage,
   isHttpsDatasetUrl,
   isHttpsWebhook,
+  localExampleWorkUrl,
   parseConstraints,
   parseJsonObject,
   receiptExample,
@@ -65,9 +66,17 @@ describe('task capsule contract helpers', () => {
     expect(INLINE_UNIT_MAX).toBe(20_000);
   });
 
-  it('accepts HTTPS dataset URLs and rejects other schemes', () => {
+  it('accepts HTTPS dataset URLs and loopback HTTP, but rejects public HTTP', () => {
     expect(isHttpsDatasetUrl('https://files.example.com/batch.jsonl')).toBe(true);
+    expect(isHttpsDatasetUrl('http://127.0.0.1:5174/examples/work.json')).toBe(true);
+    expect(isHttpsDatasetUrl('http://localhost:5174/examples/work.json')).toBe(true);
     expect(isHttpsDatasetUrl('http://files.example.com/batch.jsonl')).toBe(false);
+  });
+
+  it('builds the local example work package URL from the current origin', () => {
+    expect(localExampleWorkUrl('http://127.0.0.1:5174')).toBe(
+      'http://127.0.0.1:5174/examples/work.json',
+    );
   });
 
   it('omits inline units when publishing an HTTPS dataset', () => {
@@ -146,7 +155,47 @@ describe('task capsule contract helpers', () => {
     expect(
       resolvePublishUnitCount({ mode: 'https', url: 'https://files.example.com/a.jsonl' }, [], 128),
     ).toBe(128);
+    expect(
+      resolvePublishUnitCount({ mode: 'work', url: 'https://files.example.com/work.json' }, [], 64),
+    ).toBe(64);
     expect(resolvePublishUnitCount({ mode: 'inline' }, [{ input: 1 }, { input: 2 }], 128)).toBe(2);
+  });
+
+  it('omits inline units when publishing a work package', () => {
+    const payload = attachPublishDataset(
+      {
+        title: 'Work',
+        category: 'math',
+        publicSummary: 'Hosted work package stays with the publisher',
+        requestedAgent: 'codex',
+        requestedModel: 'gpt-5.4',
+        requiredConcurrency: 3,
+        maxUnitSeconds: 60,
+        deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+        rewardPerUnit: 4,
+        validationMode: 'auto',
+        taskCapsule: {
+          version: 'ap-task/1',
+          goal: 'Answer each row',
+          inputDescription: 'One JSON object per line',
+          outputDescription: 'Any non-empty result',
+          constraints: [],
+          examples: [{ input: { q: 1 }, output: 'ok' }],
+          delivery: { format: 'text', maxBytes: 1024 },
+          acceptance: { mode: 'non_empty', criteria: ['non-empty'] },
+        },
+        deliveryTarget: { mode: 'platform' },
+        launchMode: 'pilot',
+        pilotUnits: 2,
+      },
+      { mode: 'work', url: 'https://files.example.com/work.json' },
+      [{ input: 'should-not-be-sent' }],
+    );
+    expect(payload.dataset).toEqual({
+      mode: 'work',
+      url: 'https://files.example.com/work.json',
+    });
+    expect(payload.units).toBeUndefined();
   });
 
   it('previews the same delimited task-capsule protocol used by the runner', () => {

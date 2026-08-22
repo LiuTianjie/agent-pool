@@ -28,6 +28,7 @@ import { useLiveEvents } from '../hooks/useLiveEvents';
 import { api, ApiError, normalizeList } from '../lib/api';
 import { credits, duration, percent, relativeTime } from '../lib/format';
 import { isOfficialRunner } from '../lib/officialFleet';
+import { mergeMarketPools } from '../lib/runnerMarket';
 import type {
   OfficialFleetMode,
   OfficialFleetView,
@@ -73,8 +74,7 @@ export function RunAgentPage() {
         api.runnerMarketPools(),
         api.listPools(),
       ]);
-      const ownedIds = new Set(ownedPools.map((pool) => pool.id));
-      setMarketPools(publicPools.filter((pool) => !ownedIds.has(pool.id)));
+      setMarketPools(mergeMarketPools(publicPools, ownedPools));
       setMarketError(null);
     } catch (requestError) {
       setMarketError(
@@ -152,8 +152,8 @@ export function RunAgentPage() {
     <div className="page run-agent-page">
       <PageHeader
         eyebrow="运行 Agent"
-        title="用自己的电脑来做任务"
-        description="接上本机 Codex 或 Claude，领一批来做。"
+        title="领一批，在自己的电脑上跑。"
+        description="网页只生成领取单。真正执行还要在已登录的 Codex、Claude 或本地 mock 上跑命令。"
         actions={<LiveStatus state={state} />}
       />
       {error ? <InlineError message={error} retry={() => void load()} /> : null}
@@ -191,9 +191,7 @@ export function RunAgentPage() {
               <i className="orbit-node node-three" />
             </div>
             <div>
-              <h2>
-                密钥留在这台电脑。
-              </h2>
+              <h2>密钥留在这台电脑。</h2>
               <p>用本机已登录的 Codex 或 Claude 来做。题目不会出现在这个页面。</p>
               <CopyCommand command={INSTALL_COMMAND} />
             </div>
@@ -224,9 +222,7 @@ export function RunAgentPage() {
                 </div>
                 <div>
                   <h3>登录账户</h3>
-                  <p>
-                    终端会给出一串设备码，回到这里确认这台电脑。
-                  </p>
+                  <p>终端会给出一串设备码，回到这里确认这台电脑。</p>
                   <CopyCommand command={LOGIN_COMMAND} />
                 </div>
               </article>
@@ -308,9 +304,7 @@ export function RunAgentPage() {
               <i className="orbit-node node-three" />
             </div>
             <div>
-              <h2>
-                密钥留在这台电脑。
-              </h2>
+              <h2>密钥留在这台电脑。</h2>
               <p>用本机已登录的 Codex 或 Claude 来做。题目不会出现在这个页面。</p>
               <CopyCommand command={INSTALL_COMMAND} />
             </div>
@@ -341,9 +335,7 @@ export function RunAgentPage() {
                 </div>
                 <div>
                   <h3>登录账户</h3>
-                  <p>
-                    终端会给出一串设备码，回到这里确认这台电脑。
-                  </p>
+                  <p>终端会给出一串设备码，回到这里确认这台电脑。</p>
                   <CopyCommand command={LOGIN_COMMAND} />
                 </div>
               </article>
@@ -519,9 +511,7 @@ function RunnerNodeCard({ node }: { node: RunnerNodePublic }) {
             ))}
           </div>
         ) : (
-          <p>
-            还没有能力记录。先跑下面的检查，才能领到对得上的任务。
-          </p>
+          <p>还没有能力记录。先跑下面的检查，才能领到对得上的任务。</p>
         )}
         <CopyCommand command={BENCHMARK_COMMAND} />
       </div>
@@ -537,10 +527,10 @@ function RunnerNodeCard({ node }: { node: RunnerNodePublic }) {
             aria-hidden="true"
           />
           <div>
-            <strong>{activeCount ? `${activeCount} 条任务正在执行` : '当前没有进行中的任务'}</strong>
-            <small>
-              {activeCount ? '进行中' : '现在空闲'}
-            </small>
+            <strong>
+              {activeCount ? `${activeCount} 条任务正在执行` : '当前没有进行中的任务'}
+            </strong>
+            <small>{activeCount ? '进行中' : '现在空闲'}</small>
           </div>
         </div>
         {node.activeJobs.length ? (

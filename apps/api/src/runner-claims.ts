@@ -92,8 +92,7 @@ export async function listRunnerJobs(
       AND certification.p95_ms <= pool.max_unit_seconds * 1000
      LEFT JOIN task_units unit ON unit.pool_id = pool.id
      JOIN runner_nodes node ON node.id = $1 AND node.credential_id = $2
-     WHERE pool.owner_id <> $3
-       AND pool.status IN ('piloting', 'waiting_capacity', 'queued', 'running')
+     WHERE pool.status IN ('piloting', 'waiting_capacity', 'queued', 'running')
        AND pool.deadline_at > now()
        AND (pool.delivery_mode <> 'webhook' OR node.supports_direct_webhooks)
      GROUP BY pool.id
@@ -105,7 +104,7 @@ export async function listRunnerJobs(
      ), 0)
      ORDER BY pool.reward_per_unit DESC, pool.deadline_at ASC
      LIMIT 100`,
-    [nodeId, principal.credentialId, principal.ownerId],
+    [nodeId, principal.credentialId],
   );
   return {
     jobs: result.rows.map((pool) => {
@@ -157,11 +156,50 @@ export async function createRunnerClaim(
   );
 }
 
+export interface CreateClaimOptions {
+  requireRecentHeartbeat?: boolean;
+  defaultTtlMs?: number;
+}
+
+export async function createOwnerBoundClaim(
+  app: App,
+  ownerId: string,
+  input: { nodeId: string; poolId: string; maxUnits: number },
+): Promise<RunnerClaimSummary> {
+  return withTransaction(app.db, async (client) => {
+    const node = await client.query<{
+      credential_id: string;
+      operator_type: RunnerPrincipal['operatorType'];
+    }>(
+      `SELECT n.credential_id, credential.operator_type
+       FROM runner_nodes n
+       JOIN runner_credentials credential ON credential.id = n.credential_id
+       WHERE n.id = $1 AND n.owner_id = $2 AND credential.owner_id = $2
+         AND credential.revoked_at IS NULL`,
+      [input.nodeId, ownerId],
+    );
+    const row = node.rows[0];
+    invariant(row, 404, 'RUNNER_NODE_NOT_FOUND', 'Runner node not found');
+    return createRunnerClaimInTransaction(
+      app,
+      {
+        credentialId: row.credential_id,
+        ownerId,
+        operatorType: row.operator_type,
+      },
+      input,
+      client,
+      { requireRecentHeartbeat: false, defaultTtlMs: 55 * 60_000 },
+    );
+  });
+}
+
 export async function createRunnerClaimInTransaction(
   app: App,
   principal: RunnerPrincipal,
   rawInput: unknown,
   client: DbClient,
+  options: CreateClaimOptions = {},
 ): Promise<RunnerClaimSummary> {
   const input = runnerClaimRequestSchema.parse(rawInput);
   const claimId = randomUUID();
@@ -182,12 +220,14 @@ export async function createRunnerClaimInTransaction(
   );
   const node = nodeResult.rows[0];
   invariant(node, 404, 'RUNNER_NODE_NOT_FOUND', 'Runner node not found');
-  invariant(
-    node.status === 'online' && node.last_seen_at.getTime() > Date.now() - 90_000,
-    409,
-    'RUNNER_NODE_OFFLINE',
-    'Register or heartbeat this Runner node before claiming work',
-  );
+  if (options.requireRecentHeartbeat ?? true) {
+    invariant(
+      node.status === 'online' && node.last_seen_at.getTime() > Date.now() - 90_000,
+      409,
+      'RUNNER_NODE_OFFLINE',
+      'Register or heartbeat this Runner node before claiming work',
+    );
+  }
 
   const poolResult = await client.query<{
     id: string;
@@ -206,12 +246,6 @@ export async function createRunnerClaimInTransaction(
   );
   const pool = poolResult.rows[0];
   invariant(pool, 404, 'POOL_NOT_FOUND', 'Pool not found');
-  invariant(
-    pool.owner_id !== principal.ownerId,
-    409,
-    'SELF_RENT_FORBIDDEN',
-    "A Runner cannot claim its owner's Pool",
-  );
   invariant(
     ['piloting', 'waiting_capacity', 'queued', 'running'].includes(pool.status) &&
       pool.deadline_at.getTime() > Date.now(),
@@ -282,7 +316,10 @@ export async function createRunnerClaimInTransaction(
   );
 
   const now = Date.now();
-  const defaultExpiry = Math.min(now + 10 * 60_000, pool.deadline_at.getTime());
+  const defaultExpiry = Math.min(
+    now + (options.defaultTtlMs ?? 10 * 60_000),
+    pool.deadline_at.getTime(),
+  );
   const expiresAt = input.expiresAt ? new Date(input.expiresAt) : new Date(defaultExpiry);
   invariant(
     expiresAt.getTime() >= now + 10_000 && expiresAt.getTime() <= now + 60 * 60_000,

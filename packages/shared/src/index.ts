@@ -95,18 +95,54 @@ export const DATASET_UNIT_MAX = 1_000_000;
 export const REQUIRED_CONCURRENCY_MAX = 10_000;
 export const CLAIM_UNIT_MAX = 20_000;
 
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+
+export function isLoopbackHostname(hostname: string): boolean {
+  return LOOPBACK_HOSTS.has(hostname.toLowerCase().replace(/^\[|\]$/g, ''));
+}
+
+export function isHostedUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    if (!url.hostname || url.username || url.password || url.hash) return false;
+    if (url.protocol === 'https:') return true;
+    return url.protocol === 'http:' && isLoopbackHostname(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+const hostedHttpsUrl = z.string().trim().url().max(2_048).refine(isHostedUrl, {
+  message: 'hosted URL must use HTTPS, or HTTP on localhost',
+});
+
+const relativeHostedPath = z
+  .string()
+  .trim()
+  .max(512)
+  .regex(/^\.\/[A-Za-z0-9._~-]+(?:\/[A-Za-z0-9._~-]+)*$/, {
+    message: 'relative hosted path must stay next to the work package',
+  });
+
+export const hostedAssetUrl = z.union([hostedHttpsUrl, relativeHostedPath]);
+export type HostedAssetUrl = z.infer<typeof hostedAssetUrl>;
+
+export function resolveHostedAssetUrl(packageUrl: string, assetUrl: string): string {
+  if (assetUrl.startsWith('./')) {
+    return new URL(assetUrl, packageUrl).href;
+  }
+  return assetUrl;
+}
+
 export const datasetSourceSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('inline') }),
   z.object({
     mode: z.literal('https'),
-    url: z
-      .string()
-      .trim()
-      .url()
-      .max(2_048)
-      .refine((value) => value.startsWith('https://'), {
-        message: 'dataset URL must use HTTPS',
-      }),
+    url: hostedHttpsUrl,
+  }),
+  z.object({
+    mode: z.literal('work'),
+    url: hostedHttpsUrl,
   }),
 ]);
 export type DatasetSource = z.infer<typeof datasetSourceSchema>;
@@ -251,6 +287,55 @@ export const deliveryTargetSchema = z.discriminatedUnion('mode', [
 
 export type DeliveryTarget = z.infer<typeof deliveryTargetSchema>;
 
+export const workPackageSchema = z
+  .object({
+    version: z.literal('ap-work/1'),
+    title: z.string().trim().min(3).max(120),
+    publicSummary: z.string().trim().min(8).max(300),
+    category: taskCategorySchema,
+    execution: z.object({
+      adapter: requestedAgentSchema,
+      model: z.string().trim().min(1).max(120),
+    }),
+    task: taskCapsuleSchema,
+    units: z.object({
+      url: hostedAssetUrl,
+    }),
+    answers: z
+      .object({
+        url: hostedAssetUrl,
+      })
+      .optional(),
+    delivery: deliveryTargetSchema.default({ mode: 'platform' }),
+  })
+  .superRefine((value, context) => {
+    if (value.task.acceptance.mode === 'webhook' && value.delivery.mode !== 'webhook') {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['delivery'],
+        message: 'webhook acceptance requires webhook delivery',
+      });
+    }
+    if (value.delivery.mode === 'webhook' && value.task.acceptance.mode !== 'webhook') {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['task', 'acceptance', 'mode'],
+        message: 'webhook delivery requires webhook acceptance',
+      });
+    }
+    if (
+      ['hidden_exact', 'schema_and_hidden_exact'].includes(value.task.acceptance.mode) &&
+      !value.answers
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['answers'],
+        message: 'hidden exact acceptance requires a hosted answers file',
+      });
+    }
+  });
+export type WorkPackage = z.infer<typeof workPackageSchema>;
+
 export const webhookReceiptSchema = z.object({
   protocol: z.literal('agentpool-receipt/1'),
   leaseId: z.string().uuid(),
@@ -311,7 +396,7 @@ export const createPoolSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['units'],
-        message: 'https dataset must not include inline units',
+        message: 'hosted publish must not include inline units',
       });
     }
     if (!value.taskCapsule && !value.secretInstruction) {
@@ -412,7 +497,7 @@ export interface PoolSummary {
   pilotFailedUnits: number;
   pilotSubmittedUnits: number;
   contractHash: string;
-  datasetMode: 'inline' | 'https';
+  datasetMode: 'inline' | 'https' | 'work';
   datasetHost: string | null;
   terminalReason: 'deadline' | 'cancelled_by_publisher' | null;
   createdAt: string;
