@@ -171,10 +171,15 @@ agentpool control events --follow
 
 机器发现入口：
 
+- `GET /llms.txt`：给 Agent 的索引。
+- `GET /.well-known/agent-skills/index.json`：可安装 Skill 清单。
+- `GET /api/meta/skills`：同一份 Skill 目录的 API 形式。
 - `GET /api/meta/capabilities`：协议版本、认证方式、scope、Action、参数、请求 Schema 与幂等信息。
 - `GET /api/meta/schemas/create-pool`：发布请求的结构提示。
 - `POST /api/pools/validate`：权威、零写入校验。
 - `GET /api/events/history`：最多 25 秒的 JSON 长轮询；浏览器另可使用 SSE。
+
+可安装 Skill 在仓库 `skills/`，也托管在 `/.well-known/skills/<name>/SKILL.md`。安装：`npx skills add LiuTianjie/agent-pool`。
 
 ### 7.3 Official Fleet：`agentpool-official`
 

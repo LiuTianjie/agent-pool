@@ -1262,7 +1262,12 @@ function localDescription(): Record<string, unknown> {
   return {
     protocol: CONTROL_PROTOCOL,
     output: 'One compact JSON object per line on stdout. Diagnostics never contain tokens.',
-    discovery: 'agentpool control describe',
+    discovery: {
+      describe: 'agentpool control describe',
+      llmsTxt: 'https://agentpool.itool.tech/llms.txt',
+      skills: 'https://agentpool.itool.tech/api/meta/skills',
+      skillsIndex: 'https://agentpool.itool.tech/.well-known/agent-skills/index.json',
+    },
     schema:
       'agentpool control describe --schema task is structural guidance; tasks validate is authoritative',
     authentication: {

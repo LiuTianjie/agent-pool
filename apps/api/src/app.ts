@@ -106,7 +106,15 @@ export async function buildApp(options: BuildAppOptions): Promise<App> {
       wildcard: false,
     });
     app.get('/*', async (request, reply) => {
-      if (request.url.startsWith('/api/') || request.url === '/healthz') {
+      const path = request.url.split('?')[0] ?? '';
+      if (
+        path.startsWith('/api/') ||
+        path === '/healthz' ||
+        path === '/llms.txt' ||
+        path === '/robots.txt' ||
+        path.startsWith('/.well-known/') ||
+        path.startsWith('/docs/')
+      ) {
         throw new ApiError(404, 'NOT_FOUND', 'Route not found');
       }
       return reply.sendFile('index.html');

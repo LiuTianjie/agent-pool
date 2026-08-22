@@ -222,7 +222,12 @@ export function LandingPage() {
 
       <footer className="landing-footer section-wrap">
         <Brand />
-        <Link to="/login">已有账户</Link>
+        <nav className="landing-agent-links" aria-label="给 Agent 的入口">
+          <a href="/llms.txt">llms.txt</a>
+          <a href="/.well-known/agent-skills/index.json">Skills</a>
+          <a href="/api/meta/capabilities">capabilities</a>
+          <Link to="/login">已有账户</Link>
+        </nav>
       </footer>
     </div>
   );

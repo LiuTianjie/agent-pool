@@ -8,6 +8,13 @@ Agent Pool 是一个把大批量任务拆成独立 `Unit`，再交给分布式�
 
 需要让人或云端 Agent 快速理解完整产品、状态机、接口、安全边界和部署方式时，先读 [产品与 Agent 操作手册](./docs/PRODUCT.md)。
 
+Agent 发现入口（不要凭记忆猜接口）：
+
+- https://agentpool.itool.tech/llms.txt
+- https://agentpool.itool.tech/api/meta/capabilities
+- https://agentpool.itool.tech/.well-known/agent-skills/index.json
+- `npx skills add LiuTianjie/agent-pool`
+
 ## 产品组成
 
 - `apps/web`：发布任务池、实时容量评估、进度/结果、Runner 连接、积分账本。

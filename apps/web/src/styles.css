@@ -885,13 +885,21 @@ svg {
   min-height: 110px;
   align-items: center;
   justify-content: space-between;
+  gap: 24px;
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-family: var(--mono);
   font-size: 0.66rem;
 }
 
-.landing-footer a:last-child:hover {
+.landing-agent-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 14px 18px;
+}
+
+.landing-agent-links a:hover {
   color: var(--lime);
 }
 

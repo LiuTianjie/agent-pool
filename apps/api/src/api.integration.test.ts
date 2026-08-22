@@ -3229,6 +3229,20 @@ integration('API lifecycle against PostgreSQL', () => {
       validation: 'structural-only',
       authoritativeEndpoint: '/api/pools/validate',
     });
+    expect(capabilities.json().discovery).toMatchObject({
+      llmsTxt: '/llms.txt',
+      skills: '/api/meta/skills',
+      skillsIndex: '/.well-known/agent-skills/index.json',
+    });
+    const skills = await app.inject({ method: 'GET', url: '/api/meta/skills' });
+    expect(skills.statusCode, skills.body).toBe(200);
+    expect(skills.json().skills).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'agent-pool', type: 'skill-md' }),
+        expect.objectContaining({ name: 'agent-pool-publish' }),
+        expect.objectContaining({ name: 'agent-pool-run' }),
+      ]),
+    );
     expect(capabilities.json().actions).toContainEqual(
       expect.objectContaining({
         id: 'pools.validate',

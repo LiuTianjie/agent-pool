@@ -1,7 +1,10 @@
 import {
+  AGENT_SURFACE_PATHS,
   CONTROL_SCOPES,
   CONTROL_SCOPE_METADATA,
   HIGH_RISK_CONTROL_SCOPES,
+  PUBLIC_AGENT_SKILLS,
+  publicSkillUrl,
   TASK_CATEGORIES,
 } from '@agent-pool/shared';
 
@@ -241,6 +244,14 @@ const actions = [
   { id: 'public.pools', method: 'GET', path: '/api/public/pools', access: 'public' },
   { id: 'public.pool.get', method: 'GET', path: '/api/public/pools/{id}', access: 'public' },
   { id: 'network.pulse', method: 'GET', path: '/api/network/pulse', access: 'public' },
+  { id: 'meta.capabilities', method: 'GET', path: '/api/meta/capabilities', access: 'public' },
+  { id: 'meta.skills', method: 'GET', path: '/api/meta/skills', access: 'public' },
+  {
+    id: 'meta.createPoolSchema',
+    method: 'GET',
+    path: '/api/meta/schemas/create-pool',
+    access: 'public',
+  },
 ] as const;
 
 const emptyObjectSchema = {
@@ -515,6 +526,26 @@ export async function registerMetaRoutes(app: App): Promise<void> {
         validation: 'structural-only',
         authoritativeEndpoint: '/api/pools/validate',
       },
+      discovery: {
+        llmsTxt: AGENT_SURFACE_PATHS.llmsTxt,
+        skills: AGENT_SURFACE_PATHS.skillsApi,
+        skillsIndex: AGENT_SURFACE_PATHS.skillsIndex,
+        product: AGENT_SURFACE_PATHS.productDoc,
+        workPackage: AGENT_SURFACE_PATHS.workPackageDoc,
+        install: AGENT_SURFACE_PATHS.install,
+      },
+    }),
+  );
+
+  app.get('/api/meta/skills', async (_request, reply) =>
+    reply.header('Cache-Control', 'public, max-age=300').send({
+      $schema: 'https://schemas.agentskills.io/discovery/0.2.0/schema.json',
+      skills: PUBLIC_AGENT_SKILLS.map((skill) => ({
+        name: skill.name,
+        type: 'skill-md',
+        description: skill.description,
+        url: publicSkillUrl(skill.name),
+      })),
     }),
   );
 

@@ -605,3 +605,11 @@ export interface LiveEvent {
 export function formatCredits(value: number): string {
   return new Intl.NumberFormat('zh-CN').format(value);
 }
+
+export {
+  AGENT_SURFACE_ORIGIN,
+  AGENT_SURFACE_PATHS,
+  PUBLIC_AGENT_SKILLS,
+  publicSkillUrl,
+  type PublicAgentSkill,
+} from './agent-skills.js';
