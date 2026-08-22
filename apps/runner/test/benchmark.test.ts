@@ -82,4 +82,49 @@ describe('runBenchmark', () => {
     expect(submitted.every((item) => item.success && item.durationMs >= 0)).toBe(true);
     for (const directory of taskDirectories) await expect(access(directory)).rejects.toThrow();
   });
+
+  it('reports the first local adapter failure instead of only a 0% success rate', async () => {
+    const { AdapterExecutionError } = await import('../src/adapters/common.js');
+    const adapter: AgentAdapterDriver = {
+      name: 'mock',
+      defaultModels: ['mock-v1'],
+      detect: async () => ({ adapter: 'mock', available: true, authenticated: true }),
+      run: async () => {
+        throw new AdapterExecutionError('agent_error', 'HTTP 400: model not supported');
+      },
+    };
+    const failures: string[] = [];
+    const api = {
+      startBenchmark: async () => ({
+        benchmarkId: 'benchmark-id',
+        leases: [challengeLease(0)],
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      }),
+      submitBenchmark: async () =>
+        ({
+          adapter: 'mock',
+          model: 'mock-v1',
+          certified: false,
+          certifiedConcurrency: 0,
+          p50Ms: 0,
+          p95Ms: 0,
+          successRate: 0,
+          expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+        }) satisfies CapacityCertification,
+    };
+
+    const result = await runBenchmark({
+      api,
+      adapter,
+      model: 'mock-v1',
+      concurrency: 1,
+      nodeId: 'node-id',
+      signal: new AbortController().signal,
+      onFailure: (detail) => failures.push(detail),
+    });
+
+    expect(result.certified).toBe(false);
+    expect(result.successRate).toBe(0);
+    expect(failures).toEqual(['HTTP 400: model not supported']);
+  });
 });

@@ -7,7 +7,13 @@ import type {
   CommandExecutor,
   RunnerAdapterStatus,
 } from '../types.js';
-import { AdapterExecutionError, firstLine, safeParseObject, unavailableStatus } from './common.js';
+import {
+  AdapterExecutionError,
+  commandFailureDetail,
+  firstLine,
+  safeParseObject,
+  unavailableStatus,
+} from './common.js';
 
 export function buildClaudeArgs(model: string): string[] {
   return [
@@ -105,9 +111,12 @@ export class ClaudeAdapter implements AgentAdapterDriver {
       },
     });
 
-    if (signal.aborted) throw new AdapterExecutionError('agent_error');
+    if (signal.aborted) throw new AdapterExecutionError('agent_error', 'aborted');
     if (result.exitCode !== 0 || result.errorCode || !hasFinalOutput) {
-      throw new AdapterExecutionError('agent_error');
+      throw new AdapterExecutionError(
+        'agent_error',
+        commandFailureDetail(result) ?? (!hasFinalOutput ? 'CLI produced no result' : undefined),
+      );
     }
     await onProgress({ stage: 'checking', progress: 88 });
     try {

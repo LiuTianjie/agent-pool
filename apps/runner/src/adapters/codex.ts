@@ -9,7 +9,13 @@ import type {
   CommandExecutor,
   RunnerAdapterStatus,
 } from '../types.js';
-import { AdapterExecutionError, firstLine, safeParseObject, unavailableStatus } from './common.js';
+import {
+  AdapterExecutionError,
+  commandFailureDetail,
+  firstLine,
+  safeParseObject,
+  unavailableStatus,
+} from './common.js';
 
 function extractAgentText(event: Record<string, unknown>): string | null {
   const item = event.item;
@@ -133,9 +139,12 @@ export class CodexAdapter implements AgentAdapterDriver {
       },
     );
 
-    if (signal.aborted) throw new AdapterExecutionError('agent_error');
+    if (signal.aborted) throw new AdapterExecutionError('agent_error', 'aborted');
     if (result.exitCode !== 0 || result.errorCode || finalText === null) {
-      throw new AdapterExecutionError('agent_error');
+      throw new AdapterExecutionError(
+        'agent_error',
+        commandFailureDetail(result) ?? (finalText === null ? 'CLI produced no result' : undefined),
+      );
     }
     await onProgress({ stage: 'checking', progress: 88 });
     try {

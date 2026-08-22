@@ -294,7 +294,12 @@ export class RunnerService {
         this.activeAbortController.signal.aborted,
       );
       await this.options.api.fail(lease.leaseId, { code, retryable: true }).catch(() => undefined);
-      this.options.logger.warn('A sealed work unit was released without exposing its contents.');
+      const detail = error instanceof AdapterExecutionError ? error.detail : undefined;
+      this.options.logger.warn(
+        detail
+          ? `A sealed work unit failed: ${detail}`
+          : 'A sealed work unit was released without exposing its contents.',
+      );
     } finally {
       clearTimeout(expiryTimer);
       combinedSignal.dispose();

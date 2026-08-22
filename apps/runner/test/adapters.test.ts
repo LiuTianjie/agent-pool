@@ -165,3 +165,31 @@ describe('ClaudeAdapter', () => {
     expect(command.mock.calls[0]?.[2]?.stdin).toContain('PRIVATE SCHEMA');
   });
 });
+
+describe('adapter failure details', () => {
+  it('surfaces Codex stderr such as HTTP 400 and trusted-dir without leaking secrets', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'agentpool-adapter-test-'));
+    directories.push(directory);
+    const command = vi.fn<CommandExecutor>(async () => ({
+      exitCode: 1,
+      stdout: '',
+      stderr:
+        'authorization: Bearer sk-secret-token\nHTTP 400: model not supported\nNot in trusted dir /tmp/agentpool-task-1\n',
+      timedOut: false,
+    }));
+    const adapter = new CodexAdapter(command);
+
+    await expect(
+      adapter.run({
+        lease: lease(),
+        taskDirectory: directory,
+        signal: new AbortController().signal,
+        onProgress: () => undefined,
+      }),
+    ).rejects.toMatchObject({
+      name: 'AdapterExecutionError',
+      code: 'agent_error',
+      detail: expect.stringMatching(/HTTP 400|trusted dir/u),
+    });
+  });
+});

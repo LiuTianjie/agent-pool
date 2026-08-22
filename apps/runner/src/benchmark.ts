@@ -30,6 +30,7 @@ export async function runBenchmark(options: {
   concurrency: number;
   nodeId: string;
   signal: AbortSignal;
+  onFailure?: (detail: string) => void;
 }): Promise<CapacityCertification> {
   const { api, adapter, model, concurrency, nodeId, signal } = options;
   const challenge = await api.startBenchmark(adapter.name, model, concurrency, nodeId);
@@ -75,9 +76,13 @@ export async function runBenchmark(options: {
       } satisfies BenchmarkUnitResult;
     } catch (error) {
       if (signal.aborted) throw error;
-      if (!(error instanceof AdapterExecutionError)) {
-        // Unexpected local failures are still submitted as a failed challenge without details.
-      }
+      const detail =
+        error instanceof AdapterExecutionError
+          ? (error.detail ?? error.message)
+          : error instanceof Error
+            ? error.message
+            : 'unknown error';
+      options.onFailure?.(detail);
       return {
         leaseId: lease.leaseId,
         output: null,

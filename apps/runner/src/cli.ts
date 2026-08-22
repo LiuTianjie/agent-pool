@@ -352,6 +352,7 @@ export async function runCli(
               supportsDirectWebhooks: false,
             });
             let certification;
+            let failureHint: string | undefined;
             try {
               certification = await runBenchmark({
                 api,
@@ -360,6 +361,9 @@ export async function runCli(
                 concurrency,
                 nodeId: node.nodeId,
                 signal: controller.signal,
+                onFailure: (detail) => {
+                  failureHint ??= detail;
+                },
               });
             } finally {
               await api.disconnect(node.nodeId).catch(() => undefined);
@@ -370,6 +374,9 @@ export async function runCli(
             output.log(`P95: ${Math.round(certification.p95Ms)} ms`);
             output.log(`successRate: ${formatPercent(certification.successRate)}`);
             output.log(`expiry: ${certification.expiresAt}`);
+            if (failureHint && !certification.certified) {
+              output.error(`failure: ${failureHint}`);
+            }
             return certification.certified ? 0 : 2;
           } finally {
             controller.dispose();
