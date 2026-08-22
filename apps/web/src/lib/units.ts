@@ -32,9 +32,20 @@ export function parseUnits(raw: string, mode: UnitParseMode): TaskUnitDraft[] {
       if (!('input' in envelope)) {
         throw new Error(`第 ${index + 1} 行的 $unit 缺少 input`);
       }
-      const item = envelope as { label?: unknown; input: unknown; expectedOutput?: unknown };
+      const item = envelope as {
+        id?: unknown;
+        label?: unknown;
+        input: unknown;
+        expectedOutput?: unknown;
+      };
+      const named =
+        typeof item.id === 'string' && item.id.trim()
+          ? item.id.trim().slice(0, 120)
+          : typeof item.label === 'string' && item.label.trim()
+            ? item.label.trim().slice(0, 120)
+            : labelFor(index);
       return {
-        label: typeof item.label === 'string' ? item.label.slice(0, 120) : labelFor(index),
+        label: named,
         input: item.input,
         expectedOutput: item.expectedOutput,
       };

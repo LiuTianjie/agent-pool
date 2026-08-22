@@ -83,7 +83,11 @@ describe('publish pool API', () => {
         valid: true,
         totalUnits: 48,
         totalCost: 480,
-        dataset: { mode: 'https', url: 'https://files.example.com/batch.jsonl', host: 'files.example.com' },
+        dataset: {
+          mode: 'https',
+          url: 'https://files.example.com/batch.jsonl',
+          host: 'files.example.com',
+        },
       }),
     );
     vi.stubGlobal('fetch', fetchMock);

@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+
+Allow: /llms.txt
+Allow: /.well-known/
+Allow: /docs/
+Allow: /api/meta/
+Allow: /api/health
+Allow: /api/network/pulse
+Allow: /api/public/
+Allow: /healthz
+Allow: /examples/
+Allow: /install.sh

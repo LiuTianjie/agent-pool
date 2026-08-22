@@ -8,6 +8,13 @@ Agent Pool 是一个把大批量任务拆成独立 `Unit`，再交给分布式�
 
 需要让人或云端 Agent 快速理解完整产品、状态机、接口、安全边界和部署方式时，先读 [产品与 Agent 操作手册](./docs/PRODUCT.md)。
 
+Agent 发现入口（不要凭记忆猜接口）：
+
+- https://agentpool.itool.tech/llms.txt
+- https://agentpool.itool.tech/api/meta/capabilities
+- https://agentpool.itool.tech/.well-known/agent-skills/index.json
+- `npx skills add LiuTianjie/agent-pool`
+
 ## 产品组成
 
 - `apps/web`：发布任务池、实时容量评估、进度/结果、Runner 连接、积分账本。
@@ -18,7 +25,7 @@ Agent Pool 是一个把大批量任务拆成独立 `Unit`，再交给分布式�
 
 ## 核心约束
 
-- 一个 Pool 必须包含 `2–20,000` 个可独立执行的 Unit，不接受单体大任务。
+- 一个 Pool 必须包含至少 2 个可独立执行的 Unit。托管工作包 / JSONL 最多 1,000,000 条；粘贴导入仍限 20,000。不接受单体大任务。优先让发布者按 [`ap-work/1`](./docs/work-package.md) 自己托管题目和答案。
 - 新发布的 Pool 使用版本化 `Task Capsule` 描述目标、输入、产物、约束、示例和验收规则；合同发布后以 SHA-256 hash 固定，每个 Lease 和交付回执都绑定同一份合同。
 - 默认可以“先点火，再放量”：先执行最多 3 个 Pilot Unit，其余 Unit 保持 `held`；Pilot 全部验收后，发布者才释放剩余任务。
 - 发布者指定的 Adapter 和模型是硬约束；Runner 不允许通配符、静默降级或模型替换。
@@ -27,8 +34,8 @@ Agent Pool 是一个把大批量任务拆成独立 `Unit`，再交给分布式�
 - 每次 Claim 都绑定一个 Runner 凭证、一个具体节点、一个 Pool、数量上限和过期时间；额度耗尽、到期或撤销后进程退出。
 - 发布时的目标并发与 ETA 来自当时的可用容量快照，只是信息提示，不是预留容量、派单条件或 SLA；`requiredConcurrency` 仅限制该 Pool 同时运行的 Lease 数。
 - 发布预算从“已购买可用”移入“已购买锁定”；Unit 验收后才进入 Worker 收益，取消/最终失败的未结算 Unit 原路退回。
-- Runner 不能领取自己账户发布的 Pool，避免直接把充值积分转换为可提现收益。
-- 秘密指令、Unit 输入、期望输出、交付结果和 benchmark 挑战使用 AES-256-GCM 加密存储。
+- 可以领取自己账户发布的 Pool 来跑通流程；自跑只消耗锁定预算，不会记入收益。当前不接入支付。
+- 托管工作包的题目和答案正文不入库；平台只保存索引、哈希和加密 URL。粘贴导入的少量演示任务仍加密存储。
 
 ## Runner
 
@@ -169,7 +176,7 @@ pnpm build
 pnpm format:check
 ```
 
-`TEST_DATABASE_URL` 存在时，API 测试还会运行真实 PostgreSQL 集成链路。
+`TEST_DATABASE_URL` 存在时，API 测试还会运行真实 PostgreSQL 集成链路。本机 API 与网页起来后，可用 `pnpm loop:local` 走一遍托管工作包发布、领取和验收。示例工作包在 `/examples/work.json`。
 
 部署后的合成全链路验收（会创建两个临时测试账户、一个 Pilot Pool，以显式 Claim 执行 Unit，并执行明确标注的模拟提现）：
 

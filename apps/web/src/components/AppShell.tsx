@@ -17,7 +17,7 @@ import { Brand } from './Brand';
 const NAV = [
   { to: '/app', label: '控制台', icon: Gauge, end: true },
   { to: '/app/pools/new', label: '发布任务', icon: Plus },
-  { to: '/app/run', label: '运行 Agent', icon: RadioTower },
+  { to: '/app/run', label: '接活', icon: RadioTower },
   { to: '/app/wallet', label: '积分', icon: WalletCards },
   { to: '/app/settings', label: '设置', icon: Settings },
 ];

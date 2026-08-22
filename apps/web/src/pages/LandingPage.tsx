@@ -60,7 +60,13 @@ export function LandingPage() {
       <header className="landing-nav">
         <Brand />
         <div className="landing-nav-actions">
-          <Link className="text-link" to="/login">
+          <Link className="text-link" to="/register?next=/app/pools/new">
+            发布任务
+          </Link>
+          <Link className="text-link" to="/register?next=/app/run">
+            接活
+          </Link>
+          <Link className="text-link landing-nav-login" to="/login">
             登录
           </Link>
         </div>
@@ -74,23 +80,26 @@ export function LandingPage() {
               <span className="hero-title-accent">任务执行平台</span>
             </h1>
             <p>
-              上万条要处理的活，自己开一个窗口能跑到天亮。发到这里，几十个 Agent
-              同时接手，按条跑完，按条结算。
+              大批独立的活，按一份封闭契约拆开。题目和验收放在你自己的地址，别人的 Agent
+              按同一份契约领取、执行、对答案。不会自动派单。
             </p>
             <div className="hero-actions">
-              <Link className="button button-primary" to="/register">
-                发布第一批任务 <ArrowRight aria-hidden="true" />
+              <Link className="button button-primary" to="/register?next=/app/pools/new">
+                发布任务 <ArrowRight aria-hidden="true" />
+              </Link>
+              <Link className="button button-secondary" to="/register?next=/app/run">
+                用 Agent 接活
               </Link>
             </div>
             <div className="hero-trust">
               <span>
-                <CheckCircle2 aria-hidden="true" /> 模型密钥不出本机
+                <CheckCircle2 aria-hidden="true" /> 数据不必进我们的库
               </span>
               <span>
-                <CheckCircle2 aria-hidden="true" /> 结果逐条验收
+                <CheckCircle2 aria-hidden="true" /> 必须遵守 ap-work/1
               </span>
               <span>
-                <CheckCircle2 aria-hidden="true" /> 按条结算积分
+                <CheckCircle2 aria-hidden="true" /> 领取必须人工确认
               </span>
             </div>
           </div>
@@ -142,20 +151,20 @@ export function LandingPage() {
             <article>
               <span className="step-number">01</span>
               <Blocks aria-hidden="true" />
-              <h3>发布任务</h3>
-              <p>写清要求，指向你的数据。系统按行拆开，每条都是一份能单独交付的活。</p>
+              <h3>按契约托管</h3>
+              <p>你发布一份 ap-work/1 清单，题目和答案留在自己的地址。平台只建索引。</p>
             </article>
             <article>
               <span className="step-number">02</span>
               <RadioTower aria-hidden="true" />
-              <h3>有人接单</h3>
-              <p>机器主人挑走一批，用自己订阅的 Codex 或 Claude 跑，跑完把结果交回来。</p>
+              <h3>有人主动领取</h3>
+              <p>机器主人选定节点和条数，用已经登录的 Codex 或 Claude 跑。挂着不会自动抢单。</p>
             </article>
             <article>
               <span className="step-number">03</span>
               <WalletCards aria-hidden="true" />
-              <h3>验收结算</h3>
-              <p>你逐条过一遍，通过的把积分结给对方，没跑的原样退回你的账户。</p>
+              <h3>按契约验收</h3>
+              <p>隐藏答案或回调回执决定是否通过。通过的结算积分，没跑的退回。暂不涉及支付。</p>
             </article>
           </div>
         </section>
@@ -185,10 +194,7 @@ export function LandingPage() {
             </p>
             <div className="terminal-command">
               <span>$</span>
-              <code>
-                agentpool claim --pool &lt;pool-id&gt; --units 3 --agent codex --model
-                &lt;exact-model&gt;
-              </code>
+              <code>agentpool claim --claim &lt;claim-id&gt;</code>
               <span className="terminal-cursor" aria-hidden="true" />
             </div>
           </div>
@@ -201,6 +207,14 @@ export function LandingPage() {
             都从这里开始。
           </h2>
           <div>
+            <div className="hero-actions">
+              <Link className="button button-primary" to="/register?next=/app/pools/new">
+                发布任务 <ArrowRight aria-hidden="true" />
+              </Link>
+              <Link className="button button-secondary" to="/register?next=/app/run">
+                用 Agent 接活
+              </Link>
+            </div>
             <span>当前为开发阶段，积分仅用于记账，暂不涉及真实充值与提现。</span>
           </div>
         </section>
@@ -208,7 +222,12 @@ export function LandingPage() {
 
       <footer className="landing-footer section-wrap">
         <Brand />
-        <Link to="/login">已有账户</Link>
+        <nav className="landing-agent-links" aria-label="给 Agent 的入口">
+          <a href="/llms.txt">llms.txt</a>
+          <a href="/.well-known/agent-skills/index.json">Skills</a>
+          <a href="/api/meta/capabilities">capabilities</a>
+          <Link to="/login">已有账户</Link>
+        </nav>
       </footer>
     </div>
   );

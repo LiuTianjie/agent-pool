@@ -33,7 +33,7 @@ export async function registerDashboardRoutes(app: App): Promise<void> {
           accepted_units: string;
         }>(
           `SELECT count(*) AS total,
-                count(*) FILTER (WHERE status IN ('waiting_capacity', 'queued', 'running')) AS live,
+                count(*) FILTER (WHERE status IN ('piloting', 'waiting_capacity', 'queued', 'running', 'paused')) AS live,
                 count(*) FILTER (WHERE status = 'completed') AS completed,
                 COALESCE(sum(total_units), 0) AS total_units,
                 COALESCE((SELECT count(*) FROM task_units u JOIN pools owned ON owned.id = u.pool_id

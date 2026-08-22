@@ -1,11 +1,13 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+// @ts-expect-error -- no project reference for scripts/*.mjs
+import { agentSurfacePlugin } from '../../scripts/agent-surface.mjs';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
   return {
-    plugins: [react()],
+    plugins: [react(), agentSurfacePlugin()],
     server: {
       port: 5173,
       proxy: {

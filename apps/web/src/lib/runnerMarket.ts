@@ -34,6 +34,25 @@ export function matchingMarketPools(
   return pools.filter((pool) => runnerMatchesPool(node, pool, now));
 }
 
+export function mergeMarketPools(
+  publicPools: RunnerMarketPool[],
+  ownedPools: RunnerMarketPool[],
+): RunnerMarketPool[] {
+  const ownedIds = new Set(ownedPools.map((pool) => pool.id));
+  const seen = new Set<string>();
+  const merged: RunnerMarketPool[] = [];
+  for (const pool of ownedPools) {
+    if (!ACTIVE_MARKET_STATES.has(pool.status) || pool.queuedUnits < 1) continue;
+    seen.add(pool.id);
+    merged.push({ ...pool, owned: true });
+  }
+  for (const pool of publicPools) {
+    if (seen.has(pool.id)) continue;
+    merged.push({ ...pool, owned: ownedIds.has(pool.id) });
+  }
+  return merged;
+}
+
 export function clampClaimUnits(value: number, availableUnits: number): number {
   return Math.max(1, Math.min(Math.floor(value), availableUnits, 20_000));
 }
@@ -67,4 +86,14 @@ export function runnerClaimCommand(
 
   const webhookFlag = pool.deliveryMode === 'webhook' ? ' --allow-webhooks' : '';
   return `agentpool claim --pool ${pool.id} --units ${safeUnits} --agent ${pool.requestedAgent} --model ${shellQuote(pool.requestedModel)}${webhookFlag}`;
+}
+
+export function runnerResumeCommand(
+  node: Pick<RunnerNodePublic, 'operatorType'>,
+  claimId: string,
+  deliveryMode: RunnerMarketPool['deliveryMode'] = 'platform',
+): string {
+  if (node.operatorType === 'official') return `agentpool-official claim --claim ${claimId}`;
+  const webhookFlag = deliveryMode === 'webhook' ? ' --allow-webhooks' : '';
+  return `agentpool claim --claim ${claimId}${webhookFlag}`;
 }

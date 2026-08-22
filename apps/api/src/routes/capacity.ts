@@ -1,8 +1,4 @@
-import {
-  DATASET_UNIT_MAX,
-  REQUIRED_CONCURRENCY_MAX,
-  agentAdapterSchema,
-} from '@agent-pool/shared';
+import { DATASET_UNIT_MAX, REQUIRED_CONCURRENCY_MAX, agentAdapterSchema } from '@agent-pool/shared';
 import { z } from 'zod';
 
 import { getCapacitySnapshot, quoteCapacity } from '../services.js';

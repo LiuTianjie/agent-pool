@@ -15,6 +15,42 @@ export interface IdempotentResult<T> extends TransactionResponse<T> {
   replayed: boolean;
 }
 
+export async function readIdempotentReplay<T>(
+  db: DbPool,
+  request: FastifyRequest,
+  encryptionKey: Buffer,
+  ownerId: string,
+  routeScope: string,
+): Promise<TransactionResponse<T> | null> {
+  const key = parseIdempotencyKey(request.headers['idempotency-key']);
+  if (!key) return null;
+  const requestHash = fingerprintRequest(request, routeScope);
+  const existing = await db.query<{
+    request_hash: string;
+    response_status: number;
+    response_ciphertext: string;
+    expires_at: Date;
+  }>(
+    `SELECT request_hash, response_status, response_ciphertext, expires_at
+     FROM idempotency_records
+     WHERE owner_id = $1 AND route_scope = $2 AND idempotency_key = $3`,
+    [ownerId, routeScope, key],
+  );
+  const row = existing.rows[0];
+  if (!row || row.expires_at.getTime() <= Date.now()) return null;
+  if (row.request_hash !== requestHash) {
+    throw new ApiError(
+      409,
+      'IDEMPOTENCY_KEY_REUSED',
+      'Idempotency-Key was already used with a different request',
+    );
+  }
+  return {
+    status: row.response_status,
+    body: decryptJson<T>(row.response_ciphertext, encryptionKey),
+  };
+}
+
 export async function withIdempotentTransaction<T>(
   pool: DbPool,
   request: FastifyRequest,

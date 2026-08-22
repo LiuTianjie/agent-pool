@@ -5,7 +5,7 @@ import type {
   TaskAcceptanceNormalization,
   TaskCapsule as SharedTaskCapsule,
 } from '@agent-pool/shared';
-import { INLINE_UNIT_MAX } from '@agent-pool/shared';
+import { INLINE_UNIT_MAX, isHostedUrl } from '@agent-pool/shared';
 import type { TaskUnitDraft } from './unitTypes';
 
 export { DATASET_UNIT_MAX, INLINE_UNIT_MAX, type DatasetSource } from '@agent-pool/shared';
@@ -266,7 +266,11 @@ export function isHttpsWebhook(value: string): boolean {
 }
 
 export function isHttpsDatasetUrl(value: string): boolean {
-  return isHttpsWebhook(value);
+  return isHostedUrl(value.trim());
+}
+
+export function localExampleWorkUrl(origin = window.location.origin): string {
+  return `${origin.replace(/\/$/, '')}/examples/work.json`;
 }
 
 export function inlineUnitLimitMessage(): string {
@@ -282,7 +286,7 @@ export function resolvePublishUnitCount(
   inlineUnits: TaskUnitDraft[],
   remoteUnitCount: number,
 ): number {
-  return dataset.mode === 'https' ? remoteUnitCount : inlineUnits.length;
+  return dataset.mode === 'inline' ? inlineUnits.length : remoteUnitCount;
 }
 
 export function attachPublishDataset(
@@ -292,6 +296,9 @@ export function attachPublishDataset(
 ): CreatePoolWebInput {
   if (dataset.mode === 'https') {
     return { ...payload, dataset: { mode: 'https', url: dataset.url } };
+  }
+  if (dataset.mode === 'work') {
+    return { ...payload, dataset: { mode: 'work', url: dataset.url } };
   }
   return { ...payload, dataset: { mode: 'inline' }, units };
 }

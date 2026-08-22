@@ -25,6 +25,7 @@ const ENTRY_LABEL: Record<LedgerEntry['kind'], string> = {
   topup: '增加积分',
   lock: '发布任务锁定',
   unlock: '未执行积分解锁',
+  self_settlement: '自己跑通',
   earning_pending: '交付待结算',
   earning_settled: '收益已结算',
   withdrawal: '提现',
@@ -319,9 +320,7 @@ export function WalletPage() {
                   onChange={(event) => setWithdrawAmount(Number(event.target.value))}
                 />
               </span>
-              <small>
-                当前最多 {credits(wallet.earnedAvailable)}。用来发布的积分不能提现。
-              </small>
+              <small>当前最多 {credits(wallet.earnedAvailable)}。用来发布的积分不能提现。</small>
             </label>
             <div className="topup-assurance">
               <ShieldCheck aria-hidden="true" />

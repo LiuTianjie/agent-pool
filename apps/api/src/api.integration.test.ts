@@ -16,9 +16,47 @@ const datasetFixture = Buffer.from(
   `${JSON.stringify({ question: 'dataset-one' })}\n${JSON.stringify({ question: 'dataset-two' })}\n`,
   'utf8',
 );
+const workUnitsFixture = Buffer.from(
+  `${JSON.stringify({ $unit: { id: 'q1', input: { q: '1+1' } } })}\n${JSON.stringify({ $unit: { id: 'q2', input: { q: '2+2' } } })}\n`,
+  'utf8',
+);
+const workAnswersFixture = Buffer.from(
+  `${JSON.stringify({ $answer: { id: 'q1', expected: { answer: '2' } } })}\n${JSON.stringify({ $answer: { id: 'q2', expected: { answer: '4' } } })}\n`,
+  'utf8',
+);
+const workPackageFixture = Buffer.from(
+  JSON.stringify({
+    version: 'ap-work/1',
+    title: 'Hosted arithmetic',
+    publicSummary: 'Two hosted questions with hosted answers.',
+    category: 'math',
+    execution: { adapter: 'mock', model: 'mock-v1' },
+    task: {
+      version: 'ap-task/1',
+      goal: 'Solve each hosted question',
+      inputDescription: 'One JSON object per line',
+      outputDescription: 'JSON object with an answer field',
+      constraints: ['Return JSON only'],
+      examples: [{ input: { q: '9+9' }, output: { answer: 'example' } }],
+      delivery: { format: 'json', maxBytes: 2048 },
+      acceptance: { mode: 'hidden_exact', criteria: ['exact'] },
+    },
+    units: { url: 'https://files.example.test/work-units.jsonl' },
+    answers: { url: 'https://files.example.test/work-answers.jsonl' },
+    delivery: { mode: 'platform' },
+  }),
+  'utf8',
+);
+const hostedFixtures: Record<string, Buffer> = {
+  'https://files.example.test/batch.jsonl': datasetFixture,
+  'https://files.example.test/work.json': workPackageFixture,
+  'https://files.example.test/work-units.jsonl': workUnitsFixture,
+  'https://files.example.test/work-answers.jsonl': workAnswersFixture,
+};
 
 async function testDatasetFetch(url: string, init?: { headers?: Record<string, string> }) {
-  if (!url.startsWith('https://files.example.test/')) {
+  const body = hostedFixtures[url];
+  if (!body) {
     throw new Error(`unexpected dataset fetch ${url}`);
   }
   const range = init?.headers?.Range;
@@ -29,13 +67,13 @@ async function testDatasetFetch(url: string, init?: { headers?: Record<string, s
     return {
       status: 206,
       headers: { get: () => 'bytes' },
-      arrayBuffer: async () => datasetFixture.subarray(start, end + 1),
+      arrayBuffer: async () => body.subarray(start, end + 1),
     };
   }
   return {
     status: 200,
-    headers: { get: () => String(datasetFixture.length) },
-    arrayBuffer: async () => datasetFixture,
+    headers: { get: () => String(body.length) },
+    arrayBuffer: async () => body,
   };
 }
 
@@ -74,6 +112,95 @@ integration('API lifecycle against PostgreSQL', () => {
       claimedUnits: number;
       status: string;
     };
+  };
+
+  const pairFreshRunner = async () => {
+    const device = await app.inject({
+      method: 'POST',
+      url: '/api/auth/device/start',
+      payload: { client: 'agentpool-cli' },
+    });
+    expect(device.statusCode, device.body).toBe(201);
+    const preview = await app.inject({
+      method: 'POST',
+      url: '/api/auth/device/preview',
+      headers: { cookie: workerCookie, origin: 'http://localhost:3000' },
+      payload: { userCode: device.json().userCode },
+    });
+    expect(preview.statusCode, preview.body).toBe(200);
+    const approval = await app.inject({
+      method: 'POST',
+      url: '/api/auth/device/approve',
+      headers: { cookie: workerCookie, origin: 'http://localhost:3000' },
+      payload: {
+        userCode: device.json().userCode,
+        expectedClient: preview.json().client,
+        expectedOperatorType: preview.json().operatorType,
+      },
+    });
+    expect(approval.statusCode, approval.body).toBe(200);
+    const issued = await app.inject({
+      method: 'POST',
+      url: '/api/auth/device/token',
+      payload: { deviceCode: device.json().deviceCode },
+    });
+    expect(issued.statusCode, issued.body).toBe(200);
+    const token = issued.json().token as string;
+    const node = await app.inject({
+      method: 'POST',
+      url: '/api/runner/nodes',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        adapter: 'mock',
+        models: ['mock-v1'],
+        concurrency: 2,
+        clientVersion: '0.1.0-test',
+        platform: 'darwin',
+        arch: 'arm64',
+      },
+    });
+    expect(node.statusCode, node.body).toBe(201);
+    const freshNodeId = node.json().nodeId as string;
+    const benchmark = await app.inject({
+      method: 'POST',
+      url: '/api/runner/benchmarks',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        nodeId: freshNodeId,
+        adapter: 'mock',
+        model: 'mock-v1',
+        requestedConcurrency: 2,
+      },
+    });
+    expect(benchmark.statusCode, benchmark.body).toBe(201);
+    const results = benchmark
+      .json()
+      .leases.map((lease: { leaseId: string; input: { text: string } }) => ({
+        leaseId: lease.leaseId,
+        output: {
+          reversed: [...lease.input.text].reverse().join(''),
+          uppercase: lease.input.text.toUpperCase(),
+          grouped: lease.input.text.match(/.{1,3}/g)?.join('-') ?? lease.input.text,
+          length: lease.input.text.length,
+        },
+        durationMs: 25,
+        success: true,
+      }));
+    const certified = await app.inject({
+      method: 'POST',
+      url: `/api/runner/benchmarks/${benchmark.json().benchmarkId}/results`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: { results },
+    });
+    expect(certified.statusCode, certified.body).toBe(200);
+    const heartbeat = await app.inject({
+      method: 'POST',
+      url: `/api/runner/nodes/${freshNodeId}/heartbeat`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: { status: 'online' },
+    });
+    expect(heartbeat.statusCode, heartbeat.body).toBe(200);
+    return { token, nodeId: freshNodeId };
   };
 
   beforeAll(async () => {
@@ -764,13 +891,21 @@ integration('API lifecycle against PostgreSQL', () => {
       headers: { authorization: `Bearer ${runnerToken}` },
       payload: { nodeId, poolId: selfOwnedPool.json().pool.id, maxUnits: 1 },
     });
-    expect(selfClaim.statusCode, selfClaim.body).toBe(409);
-    expect(selfClaim.json().error.code).toBe('SELF_RENT_FORBIDDEN');
+    expect(selfClaim.statusCode, selfClaim.body).toBe(201);
+    expect(selfClaim.json().claim.status).toBe('active');
     const selfUnits = await db.query<{ status: string }>(
       'SELECT status FROM task_units WHERE pool_id = $1 ORDER BY ordinal',
       [selfOwnedPool.json().pool.id],
     );
     expect(selfUnits.rows.map((unit) => unit.status)).toEqual(['queued', 'queued']);
+    const ownerBoundClaim = await app.inject({
+      method: 'POST',
+      url: `/api/runners/${nodeId}/claims`,
+      headers: { cookie: workerCookie, origin: 'http://localhost:3000' },
+      payload: { poolId: selfOwnedPool.json().pool.id, maxUnits: 1 },
+    });
+    expect(ownerBoundClaim.statusCode, ownerBoundClaim.body).toBe(409);
+    expect(ownerBoundClaim.json().error.code).toBe('RUNNER_CLAIM_ALREADY_ACTIVE');
     const selfCancel = await app.inject({
       method: 'POST',
       url: `/api/pools/${selfOwnedPool.json().pool.id}/cancel`,
@@ -2549,8 +2684,39 @@ integration('API lifecycle against PostgreSQL', () => {
       headers: { authorization: `Bearer ${officialCredential.token}` },
       payload: { nodeId: officialNodeId, poolId: ownPool.json().pool.id, maxUnits: 1 },
     });
-    expect(selfClaim.statusCode).toBe(409);
-    expect(selfClaim.json().error.code).toBe('SELF_RENT_FORBIDDEN');
+    expect(selfClaim.statusCode, selfClaim.body).toBe(201);
+    const selfLeased = await app.inject({
+      method: 'POST',
+      url: `/api/runner/nodes/${officialNodeId}/leases/poll`,
+      headers: { authorization: `Bearer ${officialCredential.token}` },
+      payload: {
+        adapter: 'mock',
+        models: [officialModel],
+        claimId: selfClaim.json().claim.id,
+      },
+    });
+    expect(selfLeased.statusCode, selfLeased.body).toBe(200);
+    expect(selfLeased.json().lease).toBeTruthy();
+    const selfSubmitted = await app.inject({
+      method: 'POST',
+      url: `/api/runner/leases/${selfLeased.json().lease.leaseId}/submit`,
+      headers: { authorization: `Bearer ${officialCredential.token}` },
+      payload: { output: 'official-self-run' },
+    });
+    expect(selfSubmitted.statusCode, selfSubmitted.body).toBe(200);
+    expect(selfSubmitted.json().status).toBe('accepted');
+    const ownerWalletAfterSelf = await app.inject({
+      method: 'GET',
+      url: '/api/wallet',
+      headers: { cookie: owner.cookie },
+    });
+    expect(ownerWalletAfterSelf.json().wallet.earnedAvailable).toBe(11);
+    expect(ownerWalletAfterSelf.json().wallet.purchasedLocked).toBe(5);
+    const selfSettlement = await db.query<{ kind: string }>(
+      `SELECT kind FROM credit_ledger WHERE user_id = $1 AND kind = 'self_settlement'`,
+      [owner.id],
+    );
+    expect(selfSettlement.rowCount).toBe(1);
 
     const offline = await app.inject({
       method: 'PATCH',
@@ -3063,6 +3229,20 @@ integration('API lifecycle against PostgreSQL', () => {
       validation: 'structural-only',
       authoritativeEndpoint: '/api/pools/validate',
     });
+    expect(capabilities.json().discovery).toMatchObject({
+      llmsTxt: '/llms.txt',
+      skills: '/api/meta/skills',
+      skillsIndex: '/.well-known/agent-skills/index.json',
+    });
+    const skills = await app.inject({ method: 'GET', url: '/api/meta/skills' });
+    expect(skills.statusCode, skills.body).toBe(200);
+    expect(skills.json().skills).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'agent-pool', type: 'skill-md' }),
+        expect.objectContaining({ name: 'agent-pool-publish' }),
+        expect.objectContaining({ name: 'agent-pool-run' }),
+      ]),
+    );
     expect(capabilities.json().actions).toContainEqual(
       expect.objectContaining({
         id: 'pools.validate',
@@ -3098,7 +3278,18 @@ integration('API lifecycle against PostgreSQL', () => {
     expect(createSchema.json()).toMatchObject({
       'x-agentpool-validation': 'structural-only',
       'x-agentpool-authoritative-endpoint': '/api/pools/validate',
+      required: ['requiredConcurrency', 'maxUnitSeconds', 'deadlineAt', 'rewardPerUnit'],
     });
+    expect(createSchema.json().anyOf).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          required: ['dataset'],
+        }),
+        expect.objectContaining({
+          required: ['title', 'category', 'publicSummary', 'requestedAgent', 'requestedModel'],
+        }),
+      ]),
+    );
     const validated = await app.inject({
       method: 'POST',
       url: '/api/pools/validate',
@@ -3242,7 +3433,7 @@ integration('API lifecycle against PostgreSQL', () => {
           inputDescription: 'One JSON object per line',
           outputDescription: 'Any non-empty result',
           constraints: [],
-          examples: [{ input: { question: 'dataset-one' }, output: 'ok' }],
+          examples: [{ input: { question: 'example-only' }, output: 'ok' }],
           delivery: { format: 'json', maxBytes: 2048 },
           acceptance: { mode: 'non_empty', criteria: ['non-empty'] },
         },
@@ -3254,7 +3445,8 @@ integration('API lifecycle against PostgreSQL', () => {
     const pool = created.json().pool as { id: string; totalUnits: number; datasetMode: string };
     expect(pool.totalUnits).toBe(2);
     expect(pool.datasetMode).toBe('https');
-    expect(created.body).not.toContain('dataset-one');
+    expect(created.body).not.toContain('dataset-two');
+    expect(created.body).not.toContain(datasetUrl);
     const stored = await db.query<{ input_ciphertext: string | null; input_sha256: string }>(
       `SELECT input_ciphertext, input_sha256 FROM task_units WHERE pool_id = $1 ORDER BY ordinal`,
       [pool.id],
@@ -3263,15 +3455,89 @@ integration('API lifecycle against PostgreSQL', () => {
     expect(stored.rows.every((row) => row.input_ciphertext === null)).toBe(true);
     expect(stored.rows[0]?.input_sha256).toMatch(/^[0-9a-f]{64}$/);
 
-    const claim = await claimPool(runnerToken, nodeId, pool.id, 1);
+    const runner = await pairFreshRunner();
+    const claim = await claimPool(runner.token, runner.nodeId, pool.id, 1);
     const leased = await app.inject({
       method: 'POST',
-      url: `/api/runner/nodes/${nodeId}/leases/poll`,
-      headers: { authorization: `Bearer ${runnerToken}` },
+      url: `/api/runner/nodes/${runner.nodeId}/leases/poll`,
+      headers: { authorization: `Bearer ${runner.token}` },
       payload: { adapter: 'mock', models: ['mock-v1'], claimId: claim.id },
     });
     expect(leased.statusCode, leased.body).toBe(200);
     expect(leased.json().lease.input).toEqual({ question: 'dataset-one' });
     expect(leased.body).not.toContain(datasetUrl);
+  }, 30_000);
+
+  it('publishes an ap-work/1 package without storing units or answers, then accepts from hosted answers', async () => {
+    const topup = await app.inject({
+      method: 'POST',
+      url: '/api/wallet/dev-topup',
+      headers: { cookie: publisherCookie, origin: 'http://localhost:3000' },
+      payload: { credits: 20 },
+    });
+    expect(topup.statusCode, topup.body).toBe(200);
+    const packageUrl = 'https://files.example.test/work.json';
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/pools',
+      headers: { cookie: publisherCookie, origin: 'http://localhost:3000' },
+      payload: {
+        dataset: { mode: 'work', url: packageUrl },
+        requiredConcurrency: 2,
+        maxUnitSeconds: 30,
+        deadlineAt: new Date(Date.now() + 120_000).toISOString(),
+        rewardPerUnit: 3,
+        launchMode: 'immediate',
+      },
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    const pool = created.json().pool as {
+      id: string;
+      totalUnits: number;
+      datasetMode: string;
+      title: string;
+    };
+    expect(pool.title).toBe('Hosted arithmetic');
+    expect(pool.totalUnits).toBe(2);
+    expect(pool.datasetMode).toBe('work');
+    expect(created.body).not.toContain('work-answers.jsonl');
+    expect(created.body).not.toContain('"q":"1+1"');
+    expect(created.body).not.toContain('"answer":"4"');
+    const stored = await db.query<{
+      input_ciphertext: string | null;
+      expected_output_ciphertext: string | null;
+      answer_sha256: string | null;
+    }>(
+      `SELECT input_ciphertext, expected_output_ciphertext, answer_sha256
+       FROM task_units WHERE pool_id = $1 ORDER BY ordinal`,
+      [pool.id],
+    );
+    expect(stored.rows).toHaveLength(2);
+    expect(stored.rows.every((row) => row.input_ciphertext === null)).toBe(true);
+    expect(stored.rows.every((row) => row.expected_output_ciphertext === null)).toBe(true);
+    expect(stored.rows[0]?.answer_sha256).toMatch(/^[0-9a-f]{64}$/);
+
+    const runner = await pairFreshRunner();
+    const claim = await claimPool(runner.token, runner.nodeId, pool.id, 1);
+    const leased = await app.inject({
+      method: 'POST',
+      url: `/api/runner/nodes/${runner.nodeId}/leases/poll`,
+      headers: { authorization: `Bearer ${runner.token}` },
+      payload: { adapter: 'mock', models: ['mock-v1'], claimId: claim.id },
+    });
+    expect(leased.statusCode, leased.body).toBe(200);
+    expect(leased.json().lease.input).toEqual({ q: '1+1' });
+    expect(leased.body).not.toContain('work-answers.jsonl');
+    expect(leased.body).not.toContain('"answer":"2"');
+    expect(leased.body).not.toContain(packageUrl);
+
+    const submitted = await app.inject({
+      method: 'POST',
+      url: `/api/runner/leases/${leased.json().lease.leaseId}/submit`,
+      headers: { authorization: `Bearer ${runner.token}` },
+      payload: { output: { answer: '2' } },
+    });
+    expect(submitted.statusCode, submitted.body).toBe(200);
+    expect(submitted.json().status).toBe('accepted');
   }, 30_000);
 });

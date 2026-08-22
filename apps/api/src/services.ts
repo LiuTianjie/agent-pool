@@ -247,6 +247,7 @@ export async function settleAcceptedUnit(client: DbClient, unitId: string): Prom
   const existing = await client.query('SELECT 1 FROM settlements WHERE unit_id = $1', [unitId]);
   if (existing.rowCount) return;
   const amount = safeInteger(row.reward);
+  const selfRun = row.publisher_id === row.worker_id;
 
   const publisherWallet = await client.query(
     `UPDATE wallets SET purchased_locked = purchased_locked - $2, updated_at = now()
@@ -264,21 +265,7 @@ export async function settleAcceptedUnit(client: DbClient, unitId: string): Prom
     row.publisher_id,
     'purchased_locked',
     -amount,
-    'unit_settlement',
-    'unit',
-    unitId,
-  );
-
-  await client.query(
-    `UPDATE wallets SET earned_pending = earned_pending + $2, updated_at = now() WHERE user_id = $1`,
-    [row.worker_id, amount],
-  );
-  await insertLedger(
-    client,
-    row.worker_id,
-    'earned_pending',
-    amount,
-    'unit_settlement',
+    selfRun ? 'self_settlement' : 'unit_settlement',
     'unit',
     unitId,
   );
@@ -286,41 +273,59 @@ export async function settleAcceptedUnit(client: DbClient, unitId: string): Prom
   const settlementId = randomUUID();
   await client.query(
     `INSERT INTO settlements
-       (id, unit_id, pool_id, publisher_id, worker_id, amount, status, release_at)
-     VALUES ($1, $2, $3, $4, $5, $6, 'pending', now())`,
+       (id, unit_id, pool_id, publisher_id, worker_id, amount, status, release_at, released_at)
+     VALUES ($1, $2, $3, $4, $5, $6, 'released', now(), now())`,
     [settlementId, unitId, row.pool_id, row.publisher_id, row.worker_id, amount],
   );
 
-  await client.query(
-    `UPDATE wallets
-     SET earned_pending = earned_pending - $2, earned_available = earned_available + $2, updated_at = now()
-     WHERE user_id = $1 AND earned_pending >= $2`,
-    [row.worker_id, amount],
-  );
-  await insertLedger(
-    client,
-    row.worker_id,
-    'earned_pending',
-    -amount,
-    'earning_release',
-    'settlement',
-    settlementId,
-  );
-  await insertLedger(
-    client,
-    row.worker_id,
-    'earned_available',
-    amount,
-    'earning_release',
-    'settlement',
-    settlementId,
-  );
-  await client.query(
-    `UPDATE settlements SET status = 'released', released_at = now() WHERE id = $1`,
-    [settlementId],
-  );
-  await recordEvent(client, row.publisher_id, 'wallet.updated', { poolId: row.pool_id, unitId });
-  await recordEvent(client, row.worker_id, 'wallet.updated', { unitId, earned: amount });
+  if (!selfRun) {
+    await client.query(
+      `UPDATE wallets SET earned_pending = earned_pending + $2, updated_at = now() WHERE user_id = $1`,
+      [row.worker_id, amount],
+    );
+    await insertLedger(
+      client,
+      row.worker_id,
+      'earned_pending',
+      amount,
+      'unit_settlement',
+      'unit',
+      unitId,
+    );
+    await client.query(
+      `UPDATE wallets
+       SET earned_pending = earned_pending - $2, earned_available = earned_available + $2, updated_at = now()
+       WHERE user_id = $1 AND earned_pending >= $2`,
+      [row.worker_id, amount],
+    );
+    await insertLedger(
+      client,
+      row.worker_id,
+      'earned_pending',
+      -amount,
+      'earning_release',
+      'settlement',
+      settlementId,
+    );
+    await insertLedger(
+      client,
+      row.worker_id,
+      'earned_available',
+      amount,
+      'earning_release',
+      'settlement',
+      settlementId,
+    );
+  }
+
+  await recordEvent(client, row.publisher_id, 'wallet.updated', {
+    poolId: row.pool_id,
+    unitId,
+    selfRun,
+  });
+  if (!selfRun) {
+    await recordEvent(client, row.worker_id, 'wallet.updated', { unitId, earned: amount });
+  }
   await completePoolIfFinished(client, row.pool_id, row.publisher_id);
 }
 
@@ -541,7 +546,8 @@ export function mapPoolSummary(
     pilotFailedUnits: safeInteger((row.pilot_failed_units as string) ?? 0),
     pilotSubmittedUnits: safeInteger((row.pilot_submitted_units as string) ?? 0),
     contractHash: contractHashFromPoolRow(row),
-    datasetMode: row.dataset_mode === 'https' ? 'https' : 'inline',
+    datasetMode:
+      row.dataset_mode === 'work' ? 'work' : row.dataset_mode === 'https' ? 'https' : 'inline',
     datasetHost: typeof row.dataset_host === 'string' && row.dataset_host ? row.dataset_host : null,
     createdAt: new Date(String(row.created_at)).toISOString(),
     requiredConcurrency: safeInteger(row.required_concurrency as number),

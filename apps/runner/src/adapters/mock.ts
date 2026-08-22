@@ -32,6 +32,8 @@ export class MockAdapter implements AgentAdapterDriver {
       const record = input as Record<string, unknown>;
       const explicitOutput = record.__mockOutput;
       if (explicitOutput !== undefined) return explicitOutput;
+      const arithmetic = evaluateSimpleArithmetic(record.expression);
+      if (arithmetic !== undefined) return { answer: arithmetic };
       if (typeof record.text === 'string' && typeof record.nonce === 'string') {
         return {
           reversed: [...record.text].reverse().join(''),
@@ -43,4 +45,15 @@ export class MockAdapter implements AgentAdapterDriver {
     }
     return { ok: true };
   }
+}
+
+function evaluateSimpleArithmetic(expression: unknown): string | undefined {
+  if (typeof expression !== 'string') return undefined;
+  const match = /^(-?\d+)\s*([+*-])\s*(-?\d+)$/.exec(expression.trim());
+  if (!match) return undefined;
+  const left = Number(match[1]);
+  const right = Number(match[3]);
+  if (!Number.isSafeInteger(left) || !Number.isSafeInteger(right)) return undefined;
+  const value = match[2] === '+' ? left + right : match[2] === '-' ? left - right : left * right;
+  return String(value);
 }
