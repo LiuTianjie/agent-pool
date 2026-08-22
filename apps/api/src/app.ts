@@ -104,6 +104,8 @@ export async function buildApp(options: BuildAppOptions): Promise<App> {
     await app.register(fastifyStatic, {
       root: options.config.webDistPath,
       wildcard: false,
+      decorateReply: true,
+      serveDotFiles: true,
     });
     app.get('/*', async (request, reply) => {
       const path = request.url.split('?')[0] ?? '';
