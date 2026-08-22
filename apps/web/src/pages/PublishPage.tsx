@@ -41,6 +41,13 @@ import {
   type TaskCapsule,
   type TaskExampleDraft,
 } from '../lib/taskContract';
+import {
+  clearPublishDraft,
+  defaultPublishDeadline,
+  readPublishDraft,
+  writePublishDraft,
+  type WorkPreview,
+} from '../lib/publishDraft';
 import type { CapacityCatalogItem } from '../lib/types';
 import type { TaskUnitDraft } from '../lib/unitTypes';
 import { lockedBudget, parseUnits, type UnitParseMode } from '../lib/units';
@@ -86,9 +93,7 @@ const PROBE_CAPSULE: TaskCapsule = {
 };
 
 function defaultDeadline(): string {
-  const date = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  const offset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+  return defaultPublishDeadline();
 }
 
 function deadlineIso(value: string): string {
@@ -102,59 +107,57 @@ function points(value: number): string {
   return `${formatCredits(value)} 积分`;
 }
 
-interface WorkPreview {
-  url: string;
-  title: string;
-  category: string;
-  publicSummary: string;
-  adapter: RequestedAgent;
-  model: string;
-  urlHost: string;
-  unitsHost: string;
-  answersHost: string | null;
-  acceptance: AcceptanceMode;
-  totalUnits: number;
-  taskCapsule: TaskCapsule;
-}
-
 export function PublishPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
-  const [source, setSource] = useState<SourceMode>('work');
-  const [workUrl, setWorkUrl] = useState('');
-  const [workPreview, setWorkPreview] = useState<WorkPreview | null>(null);
+  const [draft] = useState(readPublishDraft);
+  const [step, setStep] = useState<number>(draft?.step ?? 1);
+  const [source, setSource] = useState<SourceMode>(draft?.source ?? 'work');
+  const [workUrl, setWorkUrl] = useState(draft?.workUrl ?? '');
+  const [workPreview, setWorkPreview] = useState<WorkPreview | null>(draft?.workPreview ?? null);
   const [checking, setChecking] = useState(false);
 
-  const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<TaskCategory>('text');
-  const [goal, setGoal] = useState('');
-  const [inputDescription, setInputDescription] = useState('');
-  const [outputDescription, setOutputDescription] = useState('');
-  const [constraintsRaw, setConstraintsRaw] = useState('');
-  const [examples, setExamples] = useState<TaskExampleDraft[]>([{ ...EMPTY_EXAMPLE }]);
-  const [datasetUrl, setDatasetUrl] = useState('');
-  const [datasetHost, setDatasetHost] = useState<string | null>(null);
-  const [remoteUnitCount, setRemoteUnitCount] = useState(0);
-  const [datasetCheckedUrl, setDatasetCheckedUrl] = useState('');
-  const [rawUnits, setRawUnits] = useState('');
-  const [parseMode, setParseMode] = useState<UnitParseMode>('jsonl');
-  const [units, setUnits] = useState<TaskUnitDraft[]>([]);
+  const [title, setTitle] = useState(draft?.title ?? '');
+  const [category, setCategory] = useState<TaskCategory>(draft?.category ?? 'text');
+  const [goal, setGoal] = useState(draft?.goal ?? '');
+  const [inputDescription, setInputDescription] = useState(draft?.inputDescription ?? '');
+  const [outputDescription, setOutputDescription] = useState(draft?.outputDescription ?? '');
+  const [constraintsRaw, setConstraintsRaw] = useState(draft?.constraintsRaw ?? '');
+  const [examples, setExamples] = useState<TaskExampleDraft[]>(
+    draft?.examples?.length ? draft.examples : [{ ...EMPTY_EXAMPLE }],
+  );
+  const [datasetUrl, setDatasetUrl] = useState(draft?.datasetUrl ?? '');
+  const [datasetHost, setDatasetHost] = useState<string | null>(draft?.datasetHost ?? null);
+  const [remoteUnitCount, setRemoteUnitCount] = useState(draft?.remoteUnitCount ?? 0);
+  const [datasetCheckedUrl, setDatasetCheckedUrl] = useState(draft?.datasetCheckedUrl ?? '');
+  const [rawUnits, setRawUnits] = useState(draft?.rawUnits ?? '');
+  const [parseMode, setParseMode] = useState<UnitParseMode>(draft?.parseMode ?? 'jsonl');
+  const [units, setUnits] = useState<TaskUnitDraft[]>(draft?.units ?? []);
   const [parseError, setParseError] = useState<string | null>(null);
-  const [acceptanceMode, setAcceptanceMode] = useState<AcceptanceMode>('non_empty');
-  const [deliveryFormat, setDeliveryFormat] = useState<DeliveryFormat>('text');
-  const [schemaText, setSchemaText] = useState('');
-  const [deliveryTarget, setDeliveryTarget] = useState<DeliveryMode>('platform');
-  const [webhookUrl, setWebhookUrl] = useState('');
-  const [receiptSecret, setReceiptSecret] = useState(generateReceiptSecret);
+  const [acceptanceMode, setAcceptanceMode] = useState<AcceptanceMode>(
+    draft?.acceptanceMode ?? 'non_empty',
+  );
+  const [deliveryFormat, setDeliveryFormat] = useState<DeliveryFormat>(
+    draft?.deliveryFormat ?? 'text',
+  );
+  const [schemaText, setSchemaText] = useState(draft?.schemaText ?? '');
+  const [deliveryTarget, setDeliveryTarget] = useState<DeliveryMode>(
+    draft?.deliveryTarget ?? 'platform',
+  );
+  const [webhookUrl, setWebhookUrl] = useState(draft?.webhookUrl ?? '');
+  const [receiptSecret, setReceiptSecret] = useState(
+    () => draft?.receiptSecret || generateReceiptSecret(),
+  );
 
-  const [requestedAgent, setRequestedAgent] = useState<RequestedAgent>('codex');
-  const [requestedModel, setRequestedModel] = useState('');
-  const [requiredConcurrency, setRequiredConcurrency] = useState(3);
-  const [maxUnitSeconds, setMaxUnitSeconds] = useState(120);
-  const [deadlineAt, setDeadlineAt] = useState(defaultDeadline);
-  const [rewardPerUnit, setRewardPerUnit] = useState(10);
-  const [launchMode, setLaunchMode] = useState<LaunchMode>('pilot');
-  const [pilotUnits, setPilotUnits] = useState(3);
+  const [requestedAgent, setRequestedAgent] = useState<RequestedAgent>(
+    draft?.requestedAgent ?? 'codex',
+  );
+  const [requestedModel, setRequestedModel] = useState(draft?.requestedModel ?? '');
+  const [requiredConcurrency, setRequiredConcurrency] = useState(draft?.requiredConcurrency ?? 3);
+  const [maxUnitSeconds, setMaxUnitSeconds] = useState(draft?.maxUnitSeconds ?? 120);
+  const [deadlineAt, setDeadlineAt] = useState(draft?.deadlineAt ?? defaultDeadline);
+  const [rewardPerUnit, setRewardPerUnit] = useState(draft?.rewardPerUnit ?? 10);
+  const [launchMode, setLaunchMode] = useState<LaunchMode>(draft?.launchMode ?? 'pilot');
+  const [pilotUnits, setPilotUnits] = useState(draft?.pilotUnits ?? 3);
 
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [catalog, setCatalog] = useState<CapacityCatalogItem[]>([]);
@@ -168,6 +171,7 @@ export function PublishPage() {
       .then(([walletResult, catalogResult]) => {
         setWallet(walletResult);
         setCatalog(catalogResult);
+        if (draft?.requestedModel) return;
         const codex = catalogResult.find((entry) => entry.adapter === 'codex');
         if (codex?.models[0]) setRequestedModel(codex.models[0]);
       })
@@ -175,7 +179,78 @@ export function PublishPage() {
         setError(requestError instanceof ApiError ? requestError.message : '无法读取容量目录');
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [draft]);
+
+  useEffect(() => {
+    writePublishDraft({
+      v: 1,
+      step: step === 2 || step === 3 ? step : 1,
+      source,
+      workUrl,
+      workPreview,
+      title,
+      category,
+      goal,
+      inputDescription,
+      outputDescription,
+      constraintsRaw,
+      examples,
+      datasetUrl,
+      datasetHost,
+      remoteUnitCount,
+      datasetCheckedUrl,
+      rawUnits,
+      parseMode,
+      units,
+      acceptanceMode,
+      deliveryFormat,
+      schemaText,
+      deliveryTarget,
+      webhookUrl,
+      receiptSecret,
+      requestedAgent,
+      requestedModel,
+      requiredConcurrency,
+      maxUnitSeconds,
+      deadlineAt,
+      rewardPerUnit,
+      launchMode,
+      pilotUnits,
+    });
+  }, [
+    acceptanceMode,
+    category,
+    constraintsRaw,
+    datasetCheckedUrl,
+    datasetHost,
+    datasetUrl,
+    deadlineAt,
+    deliveryFormat,
+    deliveryTarget,
+    examples,
+    goal,
+    inputDescription,
+    launchMode,
+    maxUnitSeconds,
+    outputDescription,
+    parseMode,
+    pilotUnits,
+    rawUnits,
+    receiptSecret,
+    remoteUnitCount,
+    requestedAgent,
+    requestedModel,
+    requiredConcurrency,
+    rewardPerUnit,
+    schemaText,
+    source,
+    step,
+    title,
+    units,
+    webhookUrl,
+    workPreview,
+    workUrl,
+  ]);
 
   const constraints = useMemo(() => parseConstraints(constraintsRaw), [constraintsRaw]);
   const schemaState = useMemo(() => parseJsonObject(schemaText), [schemaText]);
@@ -504,6 +579,7 @@ export function PublishPage() {
     setError(null);
     try {
       const created = await api.createPool(buildPayload());
+      clearPublishDraft();
       navigate(`/app/pools/${created.id}`, { replace: true });
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : '发布失败');
