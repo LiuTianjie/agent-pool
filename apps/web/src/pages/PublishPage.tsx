@@ -16,7 +16,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { InlineError, LoadingState } from '../components/LoadingState';
 import { NumberDraftInput } from '../components/NumberDraftInput';
 import { PageHeader } from '../components/PageHeader';
@@ -201,6 +201,8 @@ export function PublishPage() {
           : 0
         : units.length;
   const budget = lockedBudget(unitCount, rewardPerUnit);
+  const purchasedAvailable = wallet?.purchasedAvailable ?? 0;
+  const budgetShort = budget > purchasedAvailable;
   const currentModels = catalog.find((entry) => entry.adapter === requestedAgent)?.models ?? [];
   const effectiveAgent = source === 'work' && workPreview ? workPreview.adapter : requestedAgent;
   const effectiveModel =
@@ -446,8 +448,12 @@ export function PublishPage() {
       if (!Number.isFinite(deadlineTime) || deadlineTime <= Date.now() + 10_000) {
         return voidError('截止时间至少晚于现在 10 秒');
       }
-      if (budget > (wallet?.purchasedAvailable || 0))
+      if (budget > (wallet?.purchasedAvailable || 0)) {
         return voidError('积分不够，请先去积分页增加');
+      }
+    }
+    if (step === 3 && budget > (wallet?.purchasedAvailable || 0)) {
+      return voidError('积分不够，请先去积分页增加');
     }
     return true;
   };
@@ -977,9 +983,16 @@ export function PublishPage() {
                   />
                 </label>
               ) : null}
-              <p className="contract-budget">
+              <p className={`contract-budget${budgetShort ? ' contract-budget-short' : ''}`}>
                 将锁定 <strong>{points(budget)}</strong>
                 {wallet ? ` · 可用 ${points(wallet.purchasedAvailable)}` : null}
+                {budgetShort ? (
+                  <>
+                    {' '}
+                    · 不够发布。
+                    <Link to="/app/wallet">去积分页增加</Link>
+                  </>
+                ) : null}
               </p>
             </article>
           </div>
@@ -1029,6 +1042,12 @@ export function PublishPage() {
                 </div>
               </dl>
               {quoteNote ? <p className="contract-quote">{quoteNote}</p> : null}
+              {budgetShort ? (
+                <p className="contract-budget contract-budget-short">
+                  积分不够，还差 {points(budget - purchasedAvailable)}。
+                  <Link to="/app/wallet">去积分页增加</Link>
+                </p>
+              ) : null}
               <p className="contract-seal">
                 <LockKeyhole aria-hidden="true" />
                 不会自动派单。领取必须由 Runner 主人显式确认。
@@ -1054,7 +1073,7 @@ export function PublishPage() {
               <button
                 className="button button-primary"
                 type="button"
-                disabled={checking}
+                disabled={checking || (step === 2 && budgetShort)}
                 onClick={() => void next()}
               >
                 下一步 <ArrowRight aria-hidden="true" />
@@ -1063,7 +1082,7 @@ export function PublishPage() {
               <button
                 className="button button-primary"
                 type="button"
-                disabled={publishing}
+                disabled={publishing || budgetShort}
                 onClick={() => void publish()}
               >
                 {publishing ? '正在发布…' : `锁定 ${points(budget)} 并发布`}

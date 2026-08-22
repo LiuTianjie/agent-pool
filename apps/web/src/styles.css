@@ -10208,6 +10208,16 @@ code {
   font-family: var(--mono);
 }
 
+.contract-budget-short,
+.contract-budget-short strong {
+  color: var(--warm);
+}
+
+.contract-budget-short a {
+  color: var(--lime);
+  margin-left: 0.4em;
+}
+
 .runner-market-owned {
   display: flex;
   gap: 10px;
