@@ -1,6 +1,8 @@
+import { homedir } from 'node:os';
+import { delimiter, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { executeCommand } from '../src/process.js';
+import { commandSearchPath, executeCommand, taskProcessEnvironment } from '../src/process.js';
 
 const original = {
   AGENTPOOL_CONTROL_TOKEN: process.env.AGENTPOOL_CONTROL_TOKEN,
@@ -31,6 +33,20 @@ describe('task process environment', () => {
 
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(result.stdout)).toEqual({ provider: 'provider-auth-remains' });
+  });
+
+  it('puts user-local and Homebrew bins ahead of a PATH that missed them', () => {
+    const home = homedir();
+    const path = commandSearchPath({ PATH: '/usr/bin:/bin' });
+    const entries = path.split(delimiter);
+    expect(entries.slice(0, 4)).toEqual([
+      join(home, '.local', 'bin'),
+      join(home, 'bin'),
+      '/opt/homebrew/bin',
+      '/usr/local/bin',
+    ]);
+    expect(entries.slice(-2)).toEqual(['/usr/bin', '/bin']);
+    expect(taskProcessEnvironment({ PATH: '/usr/bin' }).PATH).toContain(join(home, '.local', 'bin'));
   });
 });
 

@@ -1,10 +1,24 @@
 import { spawn } from 'node:child_process';
+import { homedir } from 'node:os';
+import { delimiter, join } from 'node:path';
 import type { CommandExecutor, CommandOptions, CommandResult } from './types.js';
 
 const DEFAULT_MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
 
+function extraCommandDirectories(home: string): string[] {
+  return [join(home, '.local', 'bin'), join(home, 'bin'), '/opt/homebrew/bin', '/usr/local/bin'];
+}
+
+export function commandSearchPath(source: NodeJS.ProcessEnv = process.env): string {
+  const extras = extraCommandDirectories(homedir());
+  const extraSet = new Set(extras);
+  const current = (source.PATH ?? source.Path ?? '').split(delimiter).filter(Boolean);
+  return [...extras, ...current.filter((entry) => !extraSet.has(entry))].join(delimiter);
+}
+
 export function taskProcessEnvironment(source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const environment = { ...source };
+  environment.PATH = commandSearchPath(source);
   // Do not inject control authority into a normal task Agent environment. This
   // is exposure reduction, not filesystem isolation: a replaced executable or
   // another process under the same OS user can still inspect that user's files.
