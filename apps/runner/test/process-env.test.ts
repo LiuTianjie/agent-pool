@@ -46,7 +46,9 @@ describe('task process environment', () => {
       '/usr/local/bin',
     ]);
     expect(entries.slice(-2)).toEqual(['/usr/bin', '/bin']);
-    expect(taskProcessEnvironment({ PATH: '/usr/bin' }).PATH).toContain(join(home, '.local', 'bin'));
+    expect(taskProcessEnvironment({ PATH: '/usr/bin' }).PATH).toContain(
+      join(home, '.local', 'bin'),
+    );
   });
 });
 
