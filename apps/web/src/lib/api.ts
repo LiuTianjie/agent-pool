@@ -282,8 +282,8 @@ function ledgerDescription(row: RawLedgerEntry): string {
     dev_topup: '增加开发态可消费积分',
     pool_lock: '任务预算流动',
     unit_settlement: '任务验收结算',
-    earning_release: '收益释放为可提现积分',
-    dev_withdrawal: '开发态模拟提现',
+    earning_release: '收益释放为可转出积分',
+    dev_withdrawal: '开发态模拟转出',
     pool_refund: '未执行任务预算退回',
     self_settlement: '自己跑完，积分已消耗、不计入收益',
   };

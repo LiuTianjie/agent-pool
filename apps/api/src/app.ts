@@ -21,6 +21,7 @@ import { registerPoolRoutes } from './routes/pools.js';
 import { registerPublicRoutes } from './routes/public.js';
 import { registerRunnerRoutes } from './routes/runner.js';
 import { registerWalletRoutes } from './routes/wallet.js';
+import { isKnownSpaPath, isMissingStaticAsset, requestPath } from './spa-routes.js';
 import type { App } from './types.js';
 
 export interface BuildAppOptions {
@@ -108,16 +109,20 @@ export async function buildApp(options: BuildAppOptions): Promise<App> {
       serveDotFiles: true,
     });
     app.get('/*', async (request, reply) => {
-      const path = request.url.split('?')[0] ?? '';
+      const path = requestPath(request.url);
       if (
         path.startsWith('/api/') ||
         path === '/healthz' ||
         path === '/llms.txt' ||
         path === '/robots.txt' ||
         path.startsWith('/.well-known/') ||
-        path.startsWith('/docs/')
+        path.startsWith('/docs/') ||
+        isMissingStaticAsset(path)
       ) {
         throw new ApiError(404, 'NOT_FOUND', 'Route not found');
+      }
+      if (!isKnownSpaPath(path)) {
+        return reply.code(404).sendFile('index.html');
       }
       return reply.sendFile('index.html');
     });

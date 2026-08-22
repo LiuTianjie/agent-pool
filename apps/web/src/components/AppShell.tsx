@@ -9,8 +9,8 @@ import {
   WalletCards,
   X,
 } from 'lucide-react';
-import { useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Brand } from './Brand';
 
@@ -25,30 +25,78 @@ const NAV = [
 export function AppShell() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   const signOut = async () => {
     await logout();
     navigate('/');
   };
 
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    const focusables = (): HTMLElement[] => {
+      const sidebar = sidebarRef.current;
+      if (!sidebar) return [];
+      return [...sidebar.querySelectorAll<HTMLElement>('a[href], button:not([disabled])')];
+    };
+
+    const items = focusables();
+    items[0]?.focus();
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMobileOpen(false);
+        menuButtonRef.current?.focus();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const nodes = focusables();
+      if (!nodes.length) return;
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [mobileOpen]);
+
   return (
     <div className="app-frame">
+      <a className="skip-link" href="#app-main">
+        跳到正文
+      </a>
       <header className="mobile-header">
         <Brand compact />
         <button
+          ref={menuButtonRef}
           className="icon-button"
           type="button"
           aria-label={mobileOpen ? '关闭导航' : '打开导航'}
           aria-expanded={mobileOpen}
+          aria-controls="app-sidebar"
           onClick={() => setMobileOpen((open) => !open)}
         >
           {mobileOpen ? <X /> : <Menu />}
         </button>
       </header>
 
-      <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
+      <aside
+        ref={sidebarRef}
+        id="app-sidebar"
+        className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}
+      >
         <div className="sidebar-top">
           <Brand compact />
         </div>
@@ -85,7 +133,7 @@ export function AppShell() {
           onClick={() => setMobileOpen(false)}
         />
       ) : null}
-      <main className="app-content" key={location.pathname}>
+      <main className="app-content" id="app-main">
         <Outlet />
       </main>
     </div>

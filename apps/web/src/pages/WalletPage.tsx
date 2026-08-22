@@ -12,6 +12,7 @@ import {
   WalletCards,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { DocumentTitle } from '../components/DocumentTitle';
 import { EmptyState, InlineError, LoadingState } from '../components/LoadingState';
 import { PageHeader } from '../components/PageHeader';
 import { WalletGrid } from '../components/WalletGrid';
@@ -28,7 +29,7 @@ const ENTRY_LABEL: Record<LedgerEntry['kind'], string> = {
   self_settlement: '自己跑通',
   earning_pending: '交付待结算',
   earning_settled: '收益已结算',
-  withdrawal: '提现',
+  withdrawal: '转出',
   adjustment: '账本调整',
 };
 
@@ -36,7 +37,7 @@ const BUCKET_LABEL: Record<keyof WalletSummary, string> = {
   purchasedAvailable: '可消费',
   purchasedLocked: '任务锁定',
   earnedPending: '待结算收益',
-  earnedAvailable: '可提现收益',
+  earnedAvailable: '可转出收益',
 };
 
 export function WalletPage() {
@@ -92,7 +93,7 @@ export function WalletPage() {
   const withdraw = async () => {
     if (!wallet) return;
     if (withdrawAmount < 1 || withdrawAmount > wallet.earnedAvailable) {
-      setError('只能从可提现收益中选择有效数量');
+      setError('只能从可转出收益中选择有效数量');
       return;
     }
     setWithdrawing(true);
@@ -100,11 +101,11 @@ export function WalletPage() {
     try {
       const result = await api.devWithdraw(Math.trunc(withdrawAmount));
       setWallet(result.wallet);
-      setWithdrawalNotice('已记下一笔提现，没有真实打款。');
+      setWithdrawalNotice('已记下一笔转出，没有真实打款。');
       setWithdrawOpen(false);
       setEntries(normalizeList(await api.ledger()));
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : '模拟提现失败');
+      setError(requestError instanceof ApiError ? requestError.message : '模拟转出失败');
     } finally {
       setWithdrawing(false);
     }
@@ -116,6 +117,7 @@ export function WalletPage() {
 
   return (
     <div className="page wallet-page">
+      <DocumentTitle title="积分" />
       <PageHeader
         eyebrow="积分"
         title="积分"
@@ -131,7 +133,7 @@ export function WalletPage() {
                 setWithdrawOpen(true);
               }}
             >
-              <ArrowUpFromLine aria-hidden="true" /> 提现
+              <ArrowUpFromLine aria-hidden="true" /> 转出
             </button>
             <button
               className="button button-primary"
@@ -158,7 +160,7 @@ export function WalletPage() {
           </span>
           <div>
             <h2>增加的积分</h2>
-            <p>用来发布任务，不能转给别人，也不能提现。</p>
+            <p>用来发布任务，不能转给别人，也不能转出。</p>
           </div>
         </article>
         <span className="boundary-divider">
@@ -170,7 +172,7 @@ export function WalletPage() {
           </span>
           <div>
             <h2>赚来的积分</h2>
-            <p>任务通过后先待结算，再进入可提现。</p>
+            <p>任务通过后先待结算，再进入可转出。</p>
           </div>
         </article>
       </section>
@@ -220,7 +222,7 @@ export function WalletPage() {
       <aside className="dev-money-note">
         <Info aria-hidden="true" />
         <p>
-          <strong>现在还不是真钱。</strong>增加和提现都只记账，充值和收益分开算。
+          <strong>现在还不是真钱。</strong>增加和转出都只记账，充值和收益分开算。
         </p>
       </aside>
 
@@ -268,7 +270,7 @@ export function WalletPage() {
             </label>
             <div className="topup-assurance">
               <ShieldCheck aria-hidden="true" />
-              <span>加进来的积分不能提现。</span>
+              <span>加进来的积分不能转出。</span>
             </div>
             <div className="dialog-actions">
               <button
@@ -306,10 +308,10 @@ export function WalletPage() {
             <div className="dialog-icon dialog-icon-lime">
               <ArrowUpFromLine aria-hidden="true" />
             </div>
-            <h2 id="withdraw-title">提现收益</h2>
-            <p>现在只从可提现收益里扣一笔账，不会打到银行卡。</p>
+            <h2 id="withdraw-title">转出收益</h2>
+            <p>现在只从可转出收益里扣一笔账，不会打到银行卡。</p>
             <label className="field">
-              <span>从可提现收益扣减</span>
+              <span>从可转出收益扣减</span>
               <span className="input-shell">
                 <CircleDollarSign aria-hidden="true" />
                 <input
@@ -320,11 +322,11 @@ export function WalletPage() {
                   onChange={(event) => setWithdrawAmount(Number(event.target.value))}
                 />
               </span>
-              <small>当前最多 {credits(wallet.earnedAvailable)}。用来发布的积分不能提现。</small>
+              <small>当前最多 {credits(wallet.earnedAvailable)}。用来发布的积分不能转出。</small>
             </label>
             <div className="topup-assurance">
               <ShieldCheck aria-hidden="true" />
-              <span>这是演示提现，用来看账怎么走。</span>
+              <span>这是演示转出，用来看账怎么走。</span>
             </div>
             <div className="dialog-actions">
               <button
@@ -342,7 +344,7 @@ export function WalletPage() {
                 }
                 onClick={() => void withdraw()}
               >
-                {withdrawing ? '正在处理…' : `提现 ${credits(withdrawAmount)}`}
+                {withdrawing ? '正在处理…' : `转出 ${credits(withdrawAmount)}`}
               </button>
             </div>
           </section>

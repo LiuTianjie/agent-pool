@@ -10,32 +10,16 @@ import {
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Brand } from '../components/Brand';
+import { DocumentTitle } from '../components/DocumentTitle';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import type { NetworkPulse } from '../lib/types';
 
-const PULSE_CELLS = [
-  'done',
-  'done',
-  'working',
-  'done',
-  'queued',
-  'working',
-  'done',
-  'done',
-  'queued',
-  'done',
-  'working',
-  'queued',
-  'done',
-  'done',
-  'done',
-  'working',
-  'queued',
-  'done',
-] as const;
-
 export function LandingPage() {
+  const { user } = useAuth();
   const [pulse, setPulse] = useState<NetworkPulse | null>(null);
+  const publishHref = user ? '/app/pools/new' : '/register?next=/app/pools/new';
+  const runHref = user ? '/app/run' : '/register?next=/app/run';
 
   useEffect(() => {
     let alive = true;
@@ -57,22 +41,32 @@ export function LandingPage() {
 
   return (
     <div className="landing">
+      <DocumentTitle title="Agent Pool" />
+      <a className="skip-link" href="#main">
+        跳到正文
+      </a>
       <header className="landing-nav">
         <Brand />
         <div className="landing-nav-actions">
-          <Link className="text-link" to="/register?next=/app/pools/new">
+          <Link className="text-link" to={publishHref}>
             发布任务
           </Link>
-          <Link className="text-link" to="/register?next=/app/run">
+          <Link className="text-link" to={runHref}>
             接活
           </Link>
-          <Link className="text-link landing-nav-login" to="/login">
-            登录
-          </Link>
+          {user ? (
+            <Link className="text-link landing-nav-login" to="/app">
+              控制台
+            </Link>
+          ) : (
+            <Link className="text-link landing-nav-login" to="/login">
+              登录
+            </Link>
+          )}
         </div>
       </header>
 
-      <main>
+      <main id="main">
         <section className="hero section-wrap">
           <div className="hero-copy reveal">
             <h1>
@@ -84,10 +78,10 @@ export function LandingPage() {
               按同一份契约领取、执行、对答案。不会自动派单。
             </p>
             <div className="hero-actions">
-              <Link className="button button-primary" to="/register?next=/app/pools/new">
+              <Link className="button button-primary" to={publishHref}>
                 发布任务 <ArrowRight aria-hidden="true" />
               </Link>
-              <Link className="button button-secondary" to="/register?next=/app/run">
+              <Link className="button button-secondary" to={runHref}>
                 用 Agent 接活
               </Link>
             </div>
@@ -104,28 +98,20 @@ export function LandingPage() {
             </div>
           </div>
 
-          <div className="pool-signal reveal reveal-delay" aria-label="任务执行示意">
+          <div className="pool-signal reveal reveal-delay">
             <div className="signal-header">
               <div>
-                <strong>一批数学题</strong>
+                <strong>网络此刻</strong>
               </div>
               <span className="signal-live">
                 <span />
+                公开统计
               </span>
-            </div>
-            <div className="signal-grid" aria-hidden="true">
-              {PULSE_CELLS.map((state, index) => (
-                <span
-                  key={index}
-                  className={`signal-cell signal-${state}`}
-                  style={{ '--i': index } as React.CSSProperties}
-                />
-              ))}
             </div>
             <div className="signal-meter">
               <div>
-                <span>网络节点</span>
-                <strong>{pulse ? pulse.onlineNodes.toLocaleString('zh-CN') : '等待信号'}</strong>
+                <span>在线节点</span>
+                <strong>{pulse ? pulse.onlineNodes.toLocaleString('zh-CN') : '—'}</strong>
               </div>
               <div>
                 <span>排队任务</span>
@@ -137,7 +123,7 @@ export function LandingPage() {
               </div>
             </div>
             <div className="signal-footer">
-              <span>一格一条任务，谁领到谁跑</span>
+              <span>只显示公开 pulse，不是演示动画</span>
               <Blocks aria-hidden="true" />
             </div>
           </div>
@@ -202,31 +188,33 @@ export function LandingPage() {
 
         <section className="final-cta section-wrap">
           <h2>
-            有活要跑，或者有 Agent 闲着，
+            先发 3 条试跑，
             <br />
-            都从这里开始。
+            或先在本机测一遍能力。
           </h2>
           <div>
             <div className="hero-actions">
-              <Link className="button button-primary" to="/register?next=/app/pools/new">
-                发布任务 <ArrowRight aria-hidden="true" />
+              <Link className="button button-primary" to={publishHref}>
+                去发布试跑 <ArrowRight aria-hidden="true" />
               </Link>
-              <Link className="button button-secondary" to="/register?next=/app/run">
-                用 Agent 接活
+              <Link className="button button-secondary" to={runHref}>
+                去看领取命令
               </Link>
             </div>
-            <span>当前为开发阶段，积分仅用于记账，暂不涉及真实充值与提现。</span>
+            <span>当前为开发阶段，积分仅用于记账，暂不涉及真实充值与出金。</span>
           </div>
         </section>
       </main>
 
       <footer className="landing-footer section-wrap">
         <Brand />
+        <nav className="landing-account-links" aria-label="账户">
+          {user ? <Link to="/app">进入控制台</Link> : <Link to="/login">已有账户</Link>}
+        </nav>
         <nav className="landing-agent-links" aria-label="给 Agent 的入口">
           <a href="/llms.txt">llms.txt</a>
           <a href="/.well-known/agent-skills/index.json">Skills</a>
           <a href="/api/meta/capabilities">capabilities</a>
-          <Link to="/login">已有账户</Link>
         </nav>
       </footer>
     </div>

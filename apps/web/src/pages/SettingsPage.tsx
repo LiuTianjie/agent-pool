@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { DocumentTitle } from '../components/DocumentTitle';
 import { InlineError } from '../components/LoadingState';
 import { PageHeader } from '../components/PageHeader';
 import { useAuth } from '../context/AuthContext';
@@ -125,6 +126,7 @@ export function SettingsPage() {
 
   return (
     <div className="page settings-page">
+      <DocumentTitle title="设置" />
       <PageHeader
         eyebrow="设置"
         title="账户设置"
@@ -213,7 +215,7 @@ export function SettingsPage() {
             </div>
             <span className="credential-count">
               {credentials.filter((credential) => credentialState(credential) === 'active').length}{' '}
-              ACTIVE
+              生效中
             </span>
           </div>
 

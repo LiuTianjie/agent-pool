@@ -163,8 +163,8 @@ export function RunnerClaimMarket({
               <select value={nodeId} onChange={(event) => setNodeId(event.target.value)}>
                 {nodes.map((node) => (
                   <option value={node.id} key={node.id}>
-                    {node.name} · {node.operatorType === 'official' ? 'OFFICIAL' : 'COMMUNITY'} ·{' '}
-                    {node.certifications.length} CERTS
+                    {node.name} · {node.operatorType === 'official' ? '官方' : '社区'} ·{' '}
+                    {node.certifications.length} 份认证
                   </option>
                 ))}
               </select>
@@ -176,15 +176,19 @@ export function RunnerClaimMarket({
                 <div>
                   <strong>{selectedNode.name}</strong>
                   <small>
-                    {selectedNode.status.toUpperCase()} · {selectedNode.platform || 'platform —'} ·{' '}
-                    {selectedNode.id.slice(0, 12)}
+                    {selectedNode.status === 'online'
+                      ? '在线'
+                      : selectedNode.status === 'paused'
+                        ? '已暂停'
+                        : '离线'}{' '}
+                    · {selectedNode.platform || '未上报平台'} · {selectedNode.id.slice(0, 12)}
                   </small>
                 </div>
                 <em className={selectedNode.operatorType === 'official' ? 'is-official' : ''}>
                   {selectedNode.operatorType === 'official' ? (
                     <ServerCog aria-hidden="true" />
                   ) : null}
-                  {selectedNode.operatorType.toUpperCase()}
+                  {selectedNode.operatorType === 'official' ? '官方' : '社区'}
                 </em>
               </article>
             ) : null}

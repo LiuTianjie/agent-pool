@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CopyCommand } from '../components/CopyCommand';
+import { DocumentTitle } from '../components/DocumentTitle';
 import { EmptyState, InlineError, LoadingState } from '../components/LoadingState';
 import { OfficialFleetCard } from '../components/OfficialFleetCard';
 import { PageHeader } from '../components/PageHeader';
@@ -150,6 +151,7 @@ export function RunAgentPage() {
 
   return (
     <div className="page run-agent-page">
+      <DocumentTitle title="接活" />
       <PageHeader
         eyebrow="运行 Agent"
         title="领一批，在自己的电脑上跑。"
@@ -452,7 +454,7 @@ function RunnerNodeCard({ node }: { node: RunnerNodePublic }) {
         <div className="node-status-stack">
           {isOfficialRunner(node) ? (
             <span className="official-node-badge">
-              <ServerCog aria-hidden="true" /> OFFICIAL
+              <ServerCog aria-hidden="true" /> 官方
             </span>
           ) : null}
           <span className={`node-status node-status-${node.status}`}>
@@ -464,14 +466,14 @@ function RunnerNodeCard({ node }: { node: RunnerNodePublic }) {
         <div>
           <Cpu aria-hidden="true" />
           <span>
-            <small>PLATFORM</small>
+            <small>平台</small>
             <strong>{node.platform || '未上报平台信息'}</strong>
           </span>
         </div>
         <div>
           <Gauge aria-hidden="true" />
           <span>
-            <small>ACTIVE / MAX</small>
+            <small>占用 / 上限</small>
             <strong>
               {node.activeLeases} / {node.maxConcurrency}
             </strong>
@@ -480,8 +482,8 @@ function RunnerNodeCard({ node }: { node: RunnerNodePublic }) {
         <div>
           <RadioTower aria-hidden="true" />
           <span>
-            <small>ANONYMOUS JOBS</small>
-            <strong>{activeCount} ACTIVE</strong>
+            <small>进行中的任务</small>
+            <strong>{activeCount} 条</strong>
           </span>
         </div>
       </div>

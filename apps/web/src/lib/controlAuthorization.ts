@@ -29,7 +29,7 @@ const CONTROL_SCOPE_PRESENTATIONS: Record<ControlScope, ControlScopePresentation
   },
   'wallet:write': {
     label: '操作资金',
-    detail: '增加或提现积分。',
+    detail: '增加或转出积分。',
     risk: 'high',
   },
   'runners:read': {

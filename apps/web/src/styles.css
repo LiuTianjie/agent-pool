@@ -120,6 +120,22 @@ svg {
   border: 0;
 }
 
+.skip-link {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  z-index: 80;
+  padding: 10px 14px;
+  color: var(--lime-ink);
+  background: var(--lime);
+  border-radius: var(--radius-sm);
+  transform: translateY(-160%);
+}
+
+.skip-link:focus-visible {
+  transform: none;
+}
+
 .mono-label,
 .section-index,
 .page-eyebrow,
@@ -428,7 +444,6 @@ svg {
 
 .hero h1 span {
   display: block;
-  white-space: nowrap;
 }
 
 .hero h1 .hero-title-accent {
@@ -885,11 +900,22 @@ svg {
   min-height: 110px;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 24px;
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-family: var(--mono);
   font-size: 0.66rem;
+}
+
+.landing-account-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+}
+
+.landing-account-links a:hover {
+  color: var(--lime);
 }
 
 .landing-agent-links {
@@ -1107,12 +1133,12 @@ select {
 
 input::placeholder,
 textarea::placeholder {
-  color: #59635b;
+  color: var(--muted);
 }
 
-input:focus,
-textarea:focus,
-select:focus {
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
   border-color: var(--lime);
   background: #0b100c;
   box-shadow: 0 0 0 3px rgba(185, 245, 66, 0.08);
@@ -1877,6 +1903,10 @@ code {
   justify-content: space-between;
   gap: 32px;
   margin-bottom: 40px;
+}
+
+.page-header .page-eyebrow {
+  margin: 0 0 4px;
 }
 
 .page-header h1,
@@ -8270,7 +8300,7 @@ code {
   }
 
   .app-frame {
-    padding: 70px 0 0;
+    padding: calc(70px + env(safe-area-inset-top, 0px)) 0 0;
   }
 
   .mobile-header {
@@ -8278,10 +8308,10 @@ code {
     z-index: 45;
     inset: 0 0 auto;
     display: flex;
-    min-height: 70px;
+    min-height: calc(70px + env(safe-area-inset-top, 0px));
     align-items: center;
     justify-content: space-between;
-    padding: 0 16px;
+    padding: env(safe-area-inset-top, 0px) 16px 0;
     background: rgba(5, 7, 6, 0.94);
     border-bottom: 1px solid var(--line);
     backdrop-filter: blur(10px);
@@ -9210,7 +9240,7 @@ code {
   font-size: 1.12rem;
 }
 
-.publish-workbench .capsule-title-field input:focus {
+.publish-workbench .capsule-title-field input:focus-visible {
   background: linear-gradient(180deg, transparent, rgba(185, 245, 66, 0.025));
   border-bottom-color: var(--lime);
   box-shadow: 0 8px 20px -18px rgba(185, 245, 66, 0.8);
@@ -9404,8 +9434,8 @@ code {
   box-shadow: none;
 }
 
-.publish-workbench .capsule-goal-field textarea:focus,
-.publish-workbench .capsule-constraints-field textarea:focus {
+.publish-workbench .capsule-goal-field textarea:focus-visible,
+.publish-workbench .capsule-constraints-field textarea:focus-visible {
   border-left-color: var(--lime);
   box-shadow: -9px 0 24px -20px rgba(185, 245, 66, 0.9);
 }
@@ -9438,9 +9468,9 @@ code {
   box-shadow: none;
 }
 
-.capsule-contract-pair textarea:focus,
-.publish-workbench .example-card-fields input:focus,
-.publish-workbench .example-card-fields textarea:focus {
+.capsule-contract-pair textarea:focus-visible,
+.publish-workbench .example-card-fields input:focus-visible,
+.publish-workbench .example-card-fields textarea:focus-visible {
   border-bottom-color: var(--lime);
   box-shadow: 0 8px 20px -20px rgba(185, 245, 66, 0.9);
 }
@@ -9631,7 +9661,7 @@ code {
   box-shadow: none;
 }
 
-.publish-workbench .unit-editor textarea:focus {
+.publish-workbench .unit-editor textarea:focus-visible {
   border-bottom-color: var(--lime);
 }
 
@@ -10113,7 +10143,7 @@ code {
   font-size: 1.05rem;
 }
 
-.contract-url-field input:focus {
+.contract-url-field input:focus-visible {
   background: linear-gradient(180deg, transparent, rgba(185, 245, 66, 0.025));
   border-bottom-color: var(--lime);
 }

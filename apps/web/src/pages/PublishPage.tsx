@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { DocumentTitle } from '../components/DocumentTitle';
 import { InlineError, LoadingState } from '../components/LoadingState';
 import { NumberDraftInput } from '../components/NumberDraftInput';
 import { PageHeader } from '../components/PageHeader';
@@ -588,10 +589,11 @@ export function PublishPage() {
     }
   };
 
-  if (loading) return <LoadingState label="正在加载" />;
+  if (loading && !wallet) return <LoadingState label="正在加载" />;
 
   return (
     <div className="page publish-page capsule-publish-page contract-publish-page">
+      <DocumentTitle title="发布任务" />
       <PageHeader
         eyebrow="发布任务"
         title="按契约发出去。"

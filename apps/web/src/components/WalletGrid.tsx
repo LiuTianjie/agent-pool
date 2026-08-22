@@ -19,7 +19,7 @@ const ITEMS: Array<{
   },
   {
     key: 'earnedAvailable',
-    label: '可提现收益',
+    label: '可转出收益',
     note: '开发期仅记账',
     icon: ArrowDownToLine,
     tone: 'white',

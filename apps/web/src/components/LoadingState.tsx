@@ -1,19 +1,33 @@
 import { Radio } from 'lucide-react';
 
-export function LoadingState({ label = '正在同步' }: { label?: string }) {
+function withEllipsis(label: string) {
+  if (label.endsWith('…')) return label;
+  if (label.endsWith('...')) return `${label.slice(0, -3)}…`;
+  return `${label}…`;
+}
+
+export function LoadingState({ label = '正在加载…' }: { label?: string }) {
   return (
     <div className="loading-state" role="status">
       <Radio aria-hidden="true" />
-      <span>{label}</span>
+      <span>{withEllipsis(label)}</span>
     </div>
   );
 }
 
-export function InlineError({ message, retry }: { message: string; retry?: () => void }) {
+export function InlineError({
+  message,
+  title,
+  retry,
+}: {
+  message: string;
+  title?: string;
+  retry?: () => void;
+}) {
   return (
     <div className="inline-error" role="alert">
       <div>
-        <strong>连接中断</strong>
+        <strong>{title ?? (retry ? '无法读取' : '没法继续')}</strong>
         <p>{message}</p>
       </div>
       {retry ? (

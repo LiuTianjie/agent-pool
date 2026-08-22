@@ -1,5 +1,5 @@
 export function PageHeader({
-  eyebrow: _eyebrow,
+  eyebrow,
   title,
   description,
   actions,
@@ -12,6 +12,7 @@ export function PageHeader({
   return (
     <header className="page-header">
       <div>
+        {eyebrow ? <p className="page-eyebrow">{eyebrow}</p> : null}
         <h1>{title}</h1>
         {description ? <p>{description}</p> : null}
       </div>

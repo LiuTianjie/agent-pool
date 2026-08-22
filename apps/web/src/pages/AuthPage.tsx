@@ -15,6 +15,7 @@ import {
 import { type CSSProperties, type FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Brand } from '../components/Brand';
+import { DocumentTitle } from '../components/DocumentTitle';
 import { useAuth } from '../context/AuthContext';
 import { ApiError } from '../lib/api';
 import { identitySignal, networkHandle, networkShortId } from '../lib/identity';
@@ -54,24 +55,24 @@ function PoolPass({
   const ready = displayName.trim().length >= 2;
   const status =
     connection === 'connected'
-      ? 'NETWORK JOINED'
+      ? '已入网'
       : connection === 'connecting'
-        ? 'CONNECTING'
+        ? '正在连接'
         : ready
-          ? 'IDENTITY READY'
-          : 'AWAITING SIGNAL';
+          ? '身份已备好'
+          : '等待输入';
 
   return (
     <div
       className={`network-pass network-pass-${connection} ${ready ? 'network-pass-ready' : ''}`}
-      aria-label={`Pool Pass，网络身份 @${handle}，短 ID ${shortId}，状态 ${status}`}
+      aria-label={`入网证，网络身份 @${handle}，短 ID ${shortId}，状态 ${status}`}
     >
       <header>
         <div className="pass-title">
           <Fingerprint aria-hidden="true" />
           <span>
-            <strong>POOL PASS</strong>
-            <small>NETWORK ID / PRIVATE BETA</small>
+            <strong>入网证</strong>
+            <small>网络身份 / 内测</small>
           </span>
         </div>
         <span className="pass-status">
@@ -80,7 +81,7 @@ function PoolPass({
       </header>
 
       <div className="pass-identity" aria-live="polite">
-        <span>HANDLE</span>
+        <span>代号</span>
         <strong>@{handle}</strong>
         <small>AP-{shortId}</small>
       </div>
@@ -93,9 +94,9 @@ function PoolPass({
 
       <footer>
         <span>
-          <RadioTower aria-hidden="true" /> LIVE IDENTITY
+          <RadioTower aria-hidden="true" /> 现场身份
         </span>
-        <span>ISSUED BY AGENT POOL</span>
+        <span>由 Agent Pool 签发</span>
         <strong>{shortId}</strong>
       </footer>
       <span className="pass-corner" aria-hidden="true" />
@@ -159,6 +160,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
   return (
     <main className={isRegister ? 'auth-page auth-page-register' : 'auth-page'}>
+      <DocumentTitle title={isRegister ? '注册' : '登录'} />
       <Link className="auth-back" to="/">
         <ArrowLeft aria-hidden="true" /> 返回首页
       </Link>
@@ -166,7 +168,14 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
       <section className="auth-brand-panel">
         <Brand />
         {isRegister ? (
-          <PoolPass displayName={displayName} connection={connection} />
+          <>
+            <div>
+              <span className="section-index">注册</span>
+              <h1>创建账户。</h1>
+              <p>这个账户不管你的模型密钥。</p>
+            </div>
+            <PoolPass displayName={displayName} connection={connection} />
+          </>
         ) : (
           <div>
             <span className="section-index">登录</span>
@@ -215,7 +224,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         ) : (
           <form className="auth-form" onSubmit={submit}>
             <div className="form-heading">
-              {isRegister ? <span>{registerStep} / 2</span> : <h2>登录 Agent Pool</h2>}
+              {isRegister ? <span>{registerStep} / 2</span> : <h2>登录账户</h2>}
             </div>
 
             {isRegister && registerStep === 1 ? (
@@ -225,14 +234,13 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                   <span className="input-shell">
                     <UserRound aria-hidden="true" />
                     <input
-                      autoFocus
                       autoComplete="name"
                       minLength={2}
                       maxLength={40}
                       required
                       value={displayName}
                       onChange={(event) => setDisplayName(event.target.value)}
-                      placeholder="例如 Nori 或 北辰"
+                      placeholder="例如 Nori 或 北辰…"
                       aria-describedby="identity-live-preview"
                     />
                   </span>
@@ -277,7 +285,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                       required
                       value={email}
                       onChange={(event) => setEmail(event.target.value)}
-                      placeholder="name@example.com"
+                      placeholder="name@example.com…"
                     />
                   </span>
                 </label>
@@ -292,7 +300,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                       required
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
-                      placeholder="至少 12 位"
+                      placeholder="至少 12 位…"
                     />
                   </span>
                 </label>

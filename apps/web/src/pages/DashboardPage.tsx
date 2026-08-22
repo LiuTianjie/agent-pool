@@ -3,6 +3,7 @@ import { ArrowRight, Plus, RadioTower, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { EmptyState, InlineError, LoadingState } from '../components/LoadingState';
+import { DocumentTitle } from '../components/DocumentTitle';
 import { PageHeader } from '../components/PageHeader';
 import { PoolCard } from '../components/PoolCard';
 import { LiveStatus } from '../components/Status';
@@ -61,6 +62,7 @@ export function DashboardPage() {
 
   return (
     <div className="page dashboard-page">
+      <DocumentTitle title="控制台" />
       <PageHeader
         eyebrow="控制台"
         title={

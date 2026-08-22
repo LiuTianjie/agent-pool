@@ -44,13 +44,13 @@ export function OfficialFleetCard({
             <i />
           </span>
           <div>
-            <h2>OFFICIAL FLEET</h2>
+            <h2>官方机队</h2>
           </div>
         </div>
         <div className="official-fleet-current" aria-live="polite">
           <span aria-hidden="true" />
           <div>
-            <strong>{fleet.mode.toUpperCase()}</strong>
+            <strong>{fleet.mode === 'offline' ? '停机' : '待命'}</strong>
           </div>
         </div>
       </header>
@@ -64,7 +64,7 @@ export function OfficialFleetCard({
               <strong>{fleet.ownerEmail}</strong>
               <span>官方节点赚到的积分进这个账户</span>
             </div>
-            <em>SERVER BOUND</em>
+            <em>绑在这台账户</em>
           </div>
 
           <div className="official-fleet-manual-rule">
@@ -89,7 +89,7 @@ export function OfficialFleetCard({
                 <Pause aria-hidden="true" />
                 <span>
                   <strong>待命</strong>
-                  <small>STANDBY</small>
+                  <small>待命</small>
                 </span>
                 <i aria-hidden="true" />
               </button>
@@ -104,7 +104,7 @@ export function OfficialFleetCard({
                 <Power aria-hidden="true" />
                 <span>
                   <strong>停机</strong>
-                  <small>OFFLINE</small>
+                  <small>离线</small>
                 </span>
                 <i aria-hidden="true" />
               </button>
@@ -158,23 +158,23 @@ export function OfficialFleetCard({
           </div>
 
           {nodes.length ? (
-            <div className="official-node-strip" aria-label="官方 Fleet Cell">
+            <div className="official-node-strip" aria-label="官方节点">
               {nodes.map((node) => (
                 <article key={node.id}>
                   <span className={`node-indicator node-${node.status}`} aria-hidden="true" />
                   <div>
                     <strong>{node.name}</strong>
                     <small>
-                      {node.activeLeases}/{node.maxConcurrency} active ·{' '}
-                      {node.platform || 'platform —'}
+                      {node.activeLeases}/{node.maxConcurrency} 占用 ·{' '}
+                      {node.platform || '未上报平台'}
                     </small>
                   </div>
                   {isOfficialRunner(node) ? (
                     <em className="official-node-badge">
-                      <ServerCog aria-hidden="true" /> OFFICIAL
+                      <ServerCog aria-hidden="true" /> 官方
                     </em>
                   ) : (
-                    <em className="operator-unverified">OPERATOR TYPE MISSING</em>
+                    <em className="operator-unverified">未标明类型</em>
                   )}
                 </article>
               ))}
@@ -202,7 +202,7 @@ export function OfficialFleetCard({
           <div className="model-path-step">
             <Bot aria-hidden="true" />
             <span>
-              <strong>Official Runner</strong>
+              <strong>官方 Runner</strong>
             </span>
           </div>
           <p>

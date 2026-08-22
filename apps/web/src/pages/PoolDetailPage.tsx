@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { DocumentTitle } from '../components/DocumentTitle';
 import { InlineError, LoadingState } from '../components/LoadingState';
 import { LiveStatus, PoolStatus } from '../components/Status';
 import { useLiveEvents } from '../hooks/useLiveEvents';
@@ -208,6 +209,7 @@ export function PoolDetailPage() {
 
   return (
     <div className="page pool-detail-page">
+      <DocumentTitle title={pool.title} />
       <Link className="back-link" to="/app">
         <ArrowLeft aria-hidden="true" /> 返回控制台
       </Link>

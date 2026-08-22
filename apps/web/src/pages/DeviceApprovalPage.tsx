@@ -11,6 +11,7 @@ import {
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Brand } from '../components/Brand';
+import { DocumentTitle } from '../components/DocumentTitle';
 import { InlineError } from '../components/LoadingState';
 import {
   controlPreviewNeedsRiskConfirmation,
@@ -149,6 +150,7 @@ export function DeviceApprovalPage() {
 
   return (
     <main className={`device-page${isControl ? ' device-page-control' : ''}`}>
+      <DocumentTitle title="确认设备" />
       <header>
         <Brand />
         <Link to={backTarget}>
@@ -212,7 +214,7 @@ export function DeviceApprovalPage() {
                   autoCapitalize="characters"
                   autoComplete="one-time-code"
                   maxLength={24}
-                  placeholder="ABCD-EFGH"
+                  placeholder="ABCD-EFGH…"
                 />
               </label>
               <button
@@ -243,10 +245,10 @@ export function DeviceApprovalPage() {
                   <span>
                     <small>
                       {preview.kind === 'control'
-                        ? 'CONTROL AGENT · 账户操作凭证'
+                        ? '控制凭证 · 账户操作'
                         : preview.operatorType === 'official'
-                          ? 'OFFICIAL FLEET · 平台官方执行凭证'
-                          : 'COMMUNITY RUNNER · 社区执行凭证'}
+                          ? '官方机队 · 平台执行凭证'
+                          : '社区 Runner · 执行凭证'}
                     </small>
                     <strong>{preview.label}</strong>
                   </span>
@@ -275,7 +277,7 @@ export function DeviceApprovalPage() {
                     <>
                       <div>
                         <dt>凭证类型</dt>
-                        <dd>{preview.operatorType === 'official' ? 'Official' : 'Community'}</dd>
+                        <dd>{preview.operatorType === 'official' ? '官方' : '社区'}</dd>
                       </div>
                       <div>
                         <dt>客户端</dt>
@@ -294,7 +296,7 @@ export function DeviceApprovalPage() {
                     <section className="device-capabilities" aria-labelledby="capability-title">
                       <header>
                         <span>
-                          <small>REQUESTED CAPABILITIES</small>
+                          <small>请求的能力</small>
                           <strong id="capability-title">这个 Agent 可以做什么</strong>
                         </span>
                         {highRiskScopes.length > 0 ? (
@@ -398,7 +400,7 @@ export function DeviceApprovalPage() {
                         checked={riskConfirmed}
                         onChange={(event) => setRiskConfirmed(event.target.checked)}
                       />
-                      <span>我确认终端明确显示 Official Fleet，并且设备码与上方一致</span>
+                      <span>我确认终端明确显示官方机队，并且设备码与上方一致</span>
                     </label>
                     <button
                       className="button button-primary button-wide"
