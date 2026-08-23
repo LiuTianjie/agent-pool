@@ -4,7 +4,7 @@ import type {
   TaskCategory,
   WalletSummary,
 } from '@agent-pool/shared';
-import { DATASET_UNIT_MAX, INLINE_UNIT_MAX, formatCredits } from '@agent-pool/shared';
+import { DATASET_UNIT_MAX, INLINE_UNIT_MAX } from '@agent-pool/shared';
 import {
   ArrowLeft,
   ArrowRight,
@@ -21,8 +21,9 @@ import { DocumentTitle } from '../components/DocumentTitle';
 import { InlineError, LoadingState } from '../components/LoadingState';
 import { NumberDraftInput } from '../components/NumberDraftInput';
 import { PageHeader } from '../components/PageHeader';
+import { useI18n, type MessageKey } from '../i18n';
 import { api, ApiError } from '../lib/api';
-import { capacityReason, fullDateTime } from '../lib/format';
+import { capacityReason, credits, formatInteger, fullDateTime } from '../lib/format';
 import {
   attachPublishDataset,
   buildTaskCapsule,
@@ -55,29 +56,38 @@ import { lockedBudget, parseUnits, type UnitParseMode } from '../lib/units';
 
 type SourceMode = DatasetSource['mode'];
 
-const CATEGORIES: Array<{ value: TaskCategory; label: string }> = [
-  { value: 'text', label: '文本' },
-  { value: 'data', label: '数据' },
-  { value: 'coding', label: '代码' },
-  { value: 'research', label: '研究' },
-  { value: 'math', label: '数学' },
-  { value: 'vision', label: '视觉' },
-  { value: 'other', label: '其他' },
+const CATEGORY_KEYS: Array<{ value: TaskCategory; label: MessageKey }> = [
+  { value: 'text', label: 'publish.categoryText' },
+  { value: 'data', label: 'publish.categoryData' },
+  { value: 'coding', label: 'publish.categoryCoding' },
+  { value: 'research', label: 'publish.categoryResearch' },
+  { value: 'math', label: 'publish.categoryMath' },
+  { value: 'vision', label: 'publish.categoryVision' },
+  { value: 'other', label: 'publish.categoryOther' },
 ];
 
-const STEPS = [
-  { id: 1, label: '契约' },
-  { id: 2, label: '条件' },
-  { id: 3, label: '确认' },
+const STEP_KEYS = [
+  { id: 1, label: 'publish.stepContract' },
+  { id: 2, label: 'publish.stepTerms' },
+  { id: 3, label: 'publish.stepConfirm' },
 ] as const;
 
-const ACCEPTANCE_LABEL: Record<AcceptanceMode, string> = {
+const ACCEPTANCE_CRITERIA: Record<AcceptanceMode, string> = {
   non_empty: '结果非空',
   hidden_exact: '与托管答案一致',
   schema: 'JSON Schema',
   schema_and_hidden_exact: 'Schema + 托管答案',
   manual: '人工确认',
   webhook: '回调回执',
+};
+
+const ACCEPTANCE_KEYS: Record<AcceptanceMode, MessageKey> = {
+  non_empty: 'publish.acceptNonEmpty',
+  hidden_exact: 'publish.acceptHiddenExact',
+  schema: 'publish.acceptSchema',
+  schema_and_hidden_exact: 'publish.acceptSchemaAndHidden',
+  manual: 'publish.acceptManual',
+  webhook: 'publish.acceptWebhook',
 };
 
 const EMPTY_EXAMPLE: TaskExampleDraft = { input: '', output: '', note: '' };
@@ -104,11 +114,8 @@ function deadlineIso(value: string): string {
     : new Date(Date.now() + 86_400_000).toISOString();
 }
 
-function points(value: number): string {
-  return `${formatCredits(value)} 积分`;
-}
-
 export function PublishPage() {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [draft] = useState(readPublishDraft);
   const [step, setStep] = useState<number>(draft?.step ?? 1);
@@ -177,10 +184,10 @@ export function PublishPage() {
         if (codex?.models[0]) setRequestedModel(codex.models[0]);
       })
       .catch((requestError) => {
-        setError(requestError instanceof ApiError ? requestError.message : '无法读取容量目录');
+        setError(requestError instanceof ApiError ? requestError.message : t('publish.loadError'));
       })
       .finally(() => setLoading(false));
-  }, [draft]);
+  }, [draft, t]);
 
   useEffect(() => {
     writePublishDraft({
@@ -284,7 +291,7 @@ export function PublishPage() {
   const effectiveModel =
     source === 'work' && workPreview ? workPreview.model : requestedModel.trim();
   const effectiveTitle =
-    source === 'work' && workPreview ? workPreview.title : title.trim() || '未命名任务';
+    source === 'work' && workPreview ? workPreview.title : title.trim() || t('common.untitledTask');
   const effectiveAcceptance =
     source === 'work' && workPreview ? workPreview.acceptance : acceptanceMode;
 
@@ -297,18 +304,18 @@ export function PublishPage() {
     try {
       const parsed = parseUnits(rawUnits, parseMode);
       if (parsed.length < 2) {
-        setParseError('至少需要 2 条任务');
+        setParseError(t('publish.minUnits'));
         return null;
       }
       if (parsed.length > INLINE_UNIT_MAX) {
-        setParseError('粘贴条数太多，请改用工作包或 JSONL 地址');
+        setParseError(t('publish.tooManyPaste'));
         return null;
       }
       setUnits(parsed);
       setParseError(null);
       return parsed;
     } catch (parseIssue) {
-      setParseError(parseIssue instanceof Error ? parseIssue.message : '无法解析这些任务');
+      setParseError(parseIssue instanceof Error ? parseIssue.message : t('publish.parseFailed'));
       return null;
     }
   };
@@ -329,7 +336,7 @@ export function PublishPage() {
       format: deliveryFormat,
       schema: schemaState.value,
       acceptanceMode,
-      criteria: [ACCEPTANCE_LABEL[acceptanceMode]],
+      criteria: [ACCEPTANCE_CRITERIA[acceptanceMode]],
     });
 
   const buildPayload = (): CreatePoolWebInput => {
@@ -369,7 +376,7 @@ export function PublishPage() {
 
   const probeWork = async (): Promise<boolean> => {
     if (!isHttpsDatasetUrl(workUrl)) {
-      return voidError('工作包必须是 HTTPS 地址，本机开发也可用 http://127.0.0.1');
+      return voidError(t('publish.workHttps'));
     }
     setChecking(true);
     setError(null);
@@ -392,7 +399,7 @@ export function PublishPage() {
         dataset: { mode: 'work', url: workUrl.trim() },
       });
       if (result.dataset.mode !== 'work' || !result.workPackage || !result.taskCapsule) {
-        return voidError('这个地址不是有效的 ap-work/1 工作包');
+        return voidError(t('publish.notWorkPackage'));
       }
       const preview: WorkPreview = {
         url: workUrl.trim(),
@@ -417,7 +424,7 @@ export function PublishPage() {
     } catch (requestError) {
       setWorkPreview(null);
       return voidError(
-        requestError instanceof ApiError ? requestError.message : '无法读取这个工作包',
+        requestError instanceof ApiError ? requestError.message : t('publish.workReadFailed'),
       );
     } finally {
       setChecking(false);
@@ -426,7 +433,7 @@ export function PublishPage() {
 
   const probeHttps = async (): Promise<boolean> => {
     if (!isHttpsDatasetUrl(datasetUrl)) {
-      return voidError('JSONL 必须是 HTTPS 地址，本机开发也可用 http://127.0.0.1');
+      return voidError(t('publish.jsonlHttps'));
     }
     setChecking(true);
     setError(null);
@@ -459,7 +466,8 @@ export function PublishPage() {
       setRemoteUnitCount(0);
       setDatasetCheckedUrl('');
       setDatasetHost(null);
-      const message = requestError instanceof ApiError ? requestError.message : '无法检查这个地址';
+      const message =
+        requestError instanceof ApiError ? requestError.message : t('publish.urlCheckFailed');
       setParseError(message);
       return voidError(message);
     } finally {
@@ -472,64 +480,65 @@ export function PublishPage() {
     if (step === 1) {
       if (source === 'work') {
         if (!workPreview || workPreview.url !== workUrl.trim()) {
-          return voidError('请先读取并确认工作包');
+          return voidError(t('publish.confirmWork'));
         }
       } else {
-        if (title.trim().length < 3) return voidError('任务名称至少 3 个字');
-        if (goal.trim().length < 8) return voidError('请写清目标');
-        if (inputDescription.trim().length < 8) return voidError('请说明每条任务提供什么');
-        if (outputDescription.trim().length < 8) return voidError('请说明希望收到什么');
+        if (title.trim().length < 3) return voidError(t('publish.titleMin'));
+        if (goal.trim().length < 8) return voidError(t('publish.goalRequired'));
+        if (inputDescription.trim().length < 8) return voidError(t('publish.inputRequired'));
+        if (outputDescription.trim().length < 8) return voidError(t('publish.outputRequired'));
         if (!examples[0]?.input.trim() || !examples[0]?.output.trim()) {
-          return voidError('至少提供 1 组示例');
+          return voidError(t('publish.exampleRequired'));
         }
-        if (!requestedModel.trim()) return voidError('请填写精确模型名称');
+        if (!requestedModel.trim()) return voidError(t('publish.modelRequired'));
         if (acceptanceMode === 'schema' || acceptanceMode === 'schema_and_hidden_exact') {
-          if (deliveryFormat !== 'json') return voidError('Schema 检查要求 JSON 结果');
-          if (!schemaState.value) return voidError(schemaState.error || '请填写 JSON Schema');
+          if (deliveryFormat !== 'json') return voidError(t('publish.schemaNeedsJson'));
+          if (!schemaState.value)
+            return voidError(schemaState.error || t('publish.schemaRequired'));
         }
         if (deliveryTarget === 'webhook' && !isHttpsWebhook(webhookUrl)) {
-          return voidError('接收地址必须是有效的 HTTPS');
+          return voidError(t('publish.webhookHttps'));
         }
-        if (source === 'https' && !httpsReady) return voidError('请先检查 JSONL 地址');
+        if (source === 'https' && !httpsReady) return voidError(t('publish.checkJsonlFirst'));
         if (source === 'inline') {
           const parsed = parseCurrentUnits();
           if (!parsed) return false;
           if (acceptanceMode === 'hidden_exact' || acceptanceMode === 'schema_and_hidden_exact') {
             if (parsed.some((unit) => unit.expectedOutput === undefined)) {
-              return voidError('与预设答案比对时，每条任务都要带 expectedOutput');
+              return voidError(t('publish.expectedOutputRequired'));
             }
           }
           if (deliveryTarget === 'webhook') {
             const issues = unitReferenceIssues(parsed);
-            if (issues.length) return voidError(issues.join('；'));
+            if (issues.length) return voidError(issues.join(' · '));
           }
         }
       }
     }
     if (step === 2) {
-      if (!unitCount) return voidError('请先确认任务数据');
+      if (!unitCount) return voidError(t('publish.confirmData'));
       if (requiredConcurrency < 1 || requiredConcurrency > unitCount) {
-        return voidError('同时领取数必须在 1 到任务条数之间');
+        return voidError(t('publish.concurrencyRange'));
       }
       if (maxUnitSeconds < 10 || maxUnitSeconds > 3600) {
-        return voidError('每条时限必须在 10–3600 秒之间');
+        return voidError(t('publish.timeoutRange'));
       }
       if (rewardPerUnit < 1 || rewardPerUnit > 1_000_000) {
-        return voidError('每条奖励必须在 1–1,000,000 积分之间');
+        return voidError(t('publish.rewardRange'));
       }
       if (launchMode === 'pilot' && (pilotUnits < 1 || pilotUnits > Math.min(3, unitCount))) {
-        return voidError('试跑条数必须在 1–3 之间');
+        return voidError(t('publish.pilotRange'));
       }
       const deadlineTime = new Date(deadlineAt).getTime();
       if (!Number.isFinite(deadlineTime) || deadlineTime <= Date.now() + 10_000) {
-        return voidError('截止时间至少晚于现在 10 秒');
+        return voidError(t('publish.deadlineSoon'));
       }
       if (budget > (wallet?.purchasedAvailable || 0)) {
-        return voidError('积分不够，请先去积分页增加');
+        return voidError(t('publish.notEnoughCredits'));
       }
     }
     if (step === 3 && budget > (wallet?.purchasedAvailable || 0)) {
-      return voidError('积分不够，请先去积分页增加');
+      return voidError(t('publish.notEnoughCredits'));
     }
     return true;
   };
@@ -562,12 +571,12 @@ export function PublishPage() {
         });
         setQuoteNote(
           nextQuote.feasible
-            ? `当前网络大约能同时跑 ${nextQuote.availableConcurrency} 条。这只是参考，不会自动派单。`
-            : nextQuote.reasons.map((reason) => capacityReason(reason)).join('；') ||
-                '容量评估未通过，仍可发布，等人主动领取。',
+            ? t('publish.quoteFeasible', { count: nextQuote.availableConcurrency })
+            : nextQuote.reasons.map((reason) => capacityReason(reason)).join(' · ') ||
+                t('publish.quoteFail'),
         );
       } catch {
-        setQuoteNote('容量评估暂时不可用，仍可发布，等人主动领取。');
+        setQuoteNote(t('publish.quoteUnavailable'));
       }
     }
     setStep((current) => Math.min(3, current + 1));
@@ -583,25 +592,27 @@ export function PublishPage() {
       clearPublishDraft();
       navigate(`/app/pools/${created.id}`, { replace: true });
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : '发布失败');
+      setError(
+        requestError instanceof ApiError ? requestError.message : t('publish.publishFailed'),
+      );
     } finally {
       setPublishing(false);
     }
   };
 
-  if (loading && !wallet) return <LoadingState label="正在加载" />;
+  if (loading && !wallet) return <LoadingState label={t('common.loading')} />;
 
   return (
     <div className="page publish-page capsule-publish-page contract-publish-page">
-      <DocumentTitle title="发布任务" />
+      <DocumentTitle title={t('publish.title')} />
       <PageHeader
-        eyebrow="发布任务"
-        title="按契约发出去。"
-        description="题目和验收放在你自己的地址。平台只记住索引、预算和领取规则。"
+        eyebrow={t('publish.title')}
+        title={t('publish.heading')}
+        description={t('publish.description')}
       />
 
-      <nav className="wizard-steps" aria-label="发布步骤">
-        {STEPS.map((item) => (
+      <nav className="wizard-steps" aria-label={t('publish.stepsAria')}>
+        {STEP_KEYS.map((item) => (
           <button
             type="button"
             key={item.id}
@@ -618,7 +629,7 @@ export function PublishPage() {
             <span>
               {item.id < step ? <Check aria-hidden="true" /> : String(item.id).padStart(2, '0')}
             </span>
-            {item.label}
+            {t(item.label)}
           </button>
         ))}
       </nav>
@@ -630,16 +641,13 @@ export function PublishPage() {
           <div className="contract-stage">
             <article className="contract-primary">
               <header>
-                <span className="contract-kicker">ap-work/1</span>
-                <h2>工作包</h2>
-                <p>
-                  一份 JSON 清单，指向你托管的题目和可选答案。不遵守这份契约，领取方的 Agent
-                  不会开工。
-                </p>
+                <span className="contract-kicker">{t('publish.contractKicker')}</span>
+                <h2>{t('publish.contractTitle')}</h2>
+                <p>{t('publish.contractLead')}</p>
               </header>
 
               <label className="field contract-url-field">
-                <span>工作包地址</span>
+                <span>{t('publish.workUrl')}</span>
                 <input
                   value={workUrl}
                   onChange={(event) => {
@@ -664,7 +672,7 @@ export function PublishPage() {
                   onClick={() => void probeWork()}
                 >
                   <Link2 aria-hidden="true" />
-                  {checking && source === 'work' ? '正在读取…' : '读取契约'}
+                  {checking && source === 'work' ? t('publish.reading') : t('publish.readContract')}
                 </button>
                 <button
                   className="button button-secondary"
@@ -677,9 +685,9 @@ export function PublishPage() {
                     setError(null);
                   }}
                 >
-                  填入本机示例
+                  {t('publish.fillExample')}
                 </button>
-                <span>正式环境必须 HTTPS。本机开发可用 127.0.0.1。</span>
+                <span>{t('publish.httpsHint')}</span>
               </div>
 
               {workPreview && workPreview.url === workUrl.trim() ? (
@@ -690,46 +698,46 @@ export function PublishPage() {
                   </div>
                   <dl>
                     <div>
-                      <dt>条数</dt>
-                      <dd>{workPreview.totalUnits.toLocaleString('zh-CN')}</dd>
+                      <dt>{t('publish.previewCount')}</dt>
+                      <dd>{formatInteger(workPreview.totalUnits)}</dd>
                     </div>
                     <div>
-                      <dt>执行</dt>
+                      <dt>{t('publish.previewRun')}</dt>
                       <dd>
                         {workPreview.adapter} / {workPreview.model}
                       </dd>
                     </div>
                     <div>
-                      <dt>验收</dt>
-                      <dd>{ACCEPTANCE_LABEL[workPreview.acceptance]}</dd>
+                      <dt>{t('publish.previewAccept')}</dt>
+                      <dd>{t(ACCEPTANCE_KEYS[workPreview.acceptance])}</dd>
                     </div>
                     <div>
-                      <dt>题目</dt>
+                      <dt>{t('publish.previewPrompts')}</dt>
                       <dd>{workPreview.unitsHost}</dd>
                     </div>
                     <div>
-                      <dt>答案</dt>
-                      <dd>{workPreview.answersHost || '无托管答案'}</dd>
+                      <dt>{t('publish.previewAnswers')}</dt>
+                      <dd>{workPreview.answersHost || t('publish.noHostedAnswer')}</dd>
                     </div>
                     <div>
-                      <dt>清单</dt>
+                      <dt>{t('publish.previewManifest')}</dt>
                       <dd>{workPreview.urlHost}</dd>
                     </div>
                   </dl>
                   <p className="contract-seal">
                     <LockKeyhole aria-hidden="true" />
-                    正文不入库。平台只保存哈希、偏移和预算。
+                    {t('publish.sealIndex')}
                   </p>
                 </div>
               ) : (
                 <div className="contract-preview">
-                  <p>读取后会看到标题、条数、执行器和托管域名。答案地址不会交给领取方。</p>
+                  <p>{t('publish.previewEmpty')}</p>
                 </div>
               )}
             </article>
 
             <details className="contract-alt">
-              <summary>不用工作包，改用 JSONL 或少量粘贴</summary>
+              <summary>{t('publish.altSummary')}</summary>
               <div className="contract-alt-body">
                 <div className="delivery-target-grid">
                   <button
@@ -739,8 +747,8 @@ export function PublishPage() {
                   >
                     <FileJson2 aria-hidden="true" />
                     <span>
-                      <strong>HTTPS JSONL</strong>
-                      <small>题目在你的文件里，合同写在本页</small>
+                      <strong>{t('publish.httpsTitle')}</strong>
+                      <small>{t('publish.httpsDetail')}</small>
                     </span>
                   </button>
                   <button
@@ -750,8 +758,8 @@ export function PublishPage() {
                   >
                     <Upload aria-hidden="true" />
                     <span>
-                      <strong>粘贴演示</strong>
-                      <small>少量任务会进平台数据库</small>
+                      <strong>{t('publish.pasteTitle')}</strong>
+                      <small>{t('publish.pasteDetail')}</small>
                     </span>
                   </button>
                 </div>
@@ -759,41 +767,41 @@ export function PublishPage() {
                 {source !== 'work' ? (
                   <div className="contract-editor">
                     <label className="field capsule-title-field">
-                      <span>任务名称</span>
+                      <span>{t('publish.taskName')}</span>
                       <input
                         value={title}
                         maxLength={120}
                         onChange={(event) => setTitle(event.target.value)}
-                        placeholder="例如：代数题逐题校验"
+                        placeholder={t('publish.taskNamePlaceholder')}
                       />
                     </label>
                     <fieldset className="field">
-                      <legend>类型</legend>
+                      <legend>{t('publish.typeLegend')}</legend>
                       <div className="chip-row">
-                        {CATEGORIES.map((item) => (
+                        {CATEGORY_KEYS.map((item) => (
                           <button
                             key={item.value}
                             type="button"
                             className={category === item.value ? 'chip chip-active' : 'chip'}
                             onClick={() => setCategory(item.value)}
                           >
-                            {item.label}
+                            {t(item.label)}
                           </button>
                         ))}
                       </div>
                     </fieldset>
                     <label className="field">
-                      <span>目标</span>
+                      <span>{t('publish.goal')}</span>
                       <textarea
                         rows={3}
                         value={goal}
                         onChange={(event) => setGoal(event.target.value)}
-                        placeholder="Agent 要完成什么"
+                        placeholder={t('publish.goalPlaceholder')}
                       />
                     </label>
                     <div className="contract-pair">
                       <label className="field">
-                        <span>每条输入</span>
+                        <span>{t('publish.eachInput')}</span>
                         <textarea
                           rows={3}
                           value={inputDescription}
@@ -801,7 +809,7 @@ export function PublishPage() {
                         />
                       </label>
                       <label className="field">
-                        <span>期望输出</span>
+                        <span>{t('publish.expectedOutput')}</span>
                         <textarea
                           rows={3}
                           value={outputDescription}
@@ -810,14 +818,14 @@ export function PublishPage() {
                       </label>
                     </div>
                     <label className="field">
-                      <span>约束（可选，逗号或换行）</span>
+                      <span>{t('publish.constraints')}</span>
                       <input
                         value={constraintsRaw}
                         onChange={(event) => setConstraintsRaw(event.target.value)}
                       />
                     </label>
                     <label className="field">
-                      <span>示例输入</span>
+                      <span>{t('publish.exampleIn')}</span>
                       <textarea
                         rows={2}
                         value={examples[0]?.input ?? ''}
@@ -829,7 +837,7 @@ export function PublishPage() {
                       />
                     </label>
                     <label className="field">
-                      <span>示例输出</span>
+                      <span>{t('publish.exampleOut')}</span>
                       <textarea
                         rows={2}
                         value={examples[0]?.output ?? ''}
@@ -842,7 +850,7 @@ export function PublishPage() {
                     </label>
                     <div className="contract-pair">
                       <label className="field">
-                        <span>执行器</span>
+                        <span>{t('publish.adapter')}</span>
                         <select
                           value={requestedAgent}
                           onChange={(event) => {
@@ -861,12 +869,12 @@ export function PublishPage() {
                         </select>
                       </label>
                       <label className="field">
-                        <span>精确模型</span>
+                        <span>{t('publish.exactModel')}</span>
                         <input
                           list="publish-models"
                           value={requestedModel}
                           onChange={(event) => setRequestedModel(event.target.value)}
-                          placeholder="必须和 Runner 认证完全一致"
+                          placeholder={t('publish.exactModelPlaceholder')}
                         />
                         <datalist id="publish-models">
                           {currentModels.map((model) => (
@@ -876,14 +884,14 @@ export function PublishPage() {
                       </label>
                     </div>
                     <fieldset className="field">
-                      <legend>怎样算做完</legend>
+                      <legend>{t('publish.howDone')}</legend>
                       <div className="chip-row">
                         {(
                           [
-                            ['non_empty', '结果非空'],
-                            ['hidden_exact', '与答案一致'],
-                            ['manual', '人工确认'],
-                            ['schema', 'JSON Schema'],
+                            ['non_empty', 'publish.acceptNonEmpty'],
+                            ['hidden_exact', 'publish.acceptHidden'],
+                            ['manual', 'publish.acceptManual'],
+                            ['schema', 'publish.acceptSchema'],
                           ] as const
                         ).map(([value, label]) => (
                           <button
@@ -892,7 +900,7 @@ export function PublishPage() {
                             className={acceptanceMode === value ? 'chip chip-active' : 'chip'}
                             onClick={() => setAcceptanceMode(value)}
                           >
-                            {label}
+                            {t(label)}
                           </button>
                         ))}
                       </div>
@@ -912,7 +920,7 @@ export function PublishPage() {
                     ) : null}
                     {source === 'https' ? (
                       <label className="field">
-                        <span>JSONL 地址</span>
+                        <span>{t('publish.jsonlUrl')}</span>
                         <input
                           value={datasetUrl}
                           onChange={(event) => {
@@ -928,17 +936,20 @@ export function PublishPage() {
                           disabled={checking}
                           onClick={() => void probeHttps()}
                         >
-                          {checking ? '检查中…' : '检查文件'}
+                          {checking ? t('publish.checking') : t('publish.checkFile')}
                         </button>
                         {httpsReady ? (
                           <small>
-                            {remoteUnitCount.toLocaleString('zh-CN')} 条 · {datasetHost}
+                            {t('publish.unitCountHost', {
+                              count: formatInteger(remoteUnitCount),
+                              host: datasetHost ?? '',
+                            })}
                           </small>
                         ) : null}
                       </label>
                     ) : (
                       <label className="field">
-                        <span>任务正文</span>
+                        <span>{t('publish.unitBody')}</span>
                         <div className="chip-row">
                           <button
                             type="button"
@@ -952,7 +963,7 @@ export function PublishPage() {
                             className={parseMode === 'lines' ? 'chip chip-active' : 'chip'}
                             onClick={() => setParseMode('lines')}
                           >
-                            每行一条
+                            {t('publish.lineEach')}
                           </button>
                         </div>
                         <textarea
@@ -978,13 +989,13 @@ export function PublishPage() {
           <div className="contract-stage">
             <article className="contract-primary">
               <header>
-                <span className="contract-kicker">市场条件</span>
-                <h2>这些留在平台。</h2>
-                <p>单价、截止、同时领取数和试跑，是市场字段，不写进工作包。</p>
+                <span className="contract-kicker">{t('publish.marketKicker')}</span>
+                <h2>{t('publish.marketTitle')}</h2>
+                <p>{t('publish.marketLead')}</p>
               </header>
               <div className="contract-market">
                 <label className="field">
-                  <span>每条积分</span>
+                  <span>{t('publish.rewardEach')}</span>
                   <NumberDraftInput
                     value={rewardPerUnit}
                     min={1}
@@ -993,7 +1004,7 @@ export function PublishPage() {
                   />
                 </label>
                 <label className="field">
-                  <span>同时领取</span>
+                  <span>{t('publish.concurrentClaim')}</span>
                   <NumberDraftInput
                     value={requiredConcurrency}
                     min={1}
@@ -1002,7 +1013,7 @@ export function PublishPage() {
                   />
                 </label>
                 <label className="field">
-                  <span>每条时限（秒）</span>
+                  <span>{t('publish.unitTimeout')}</span>
                   <NumberDraftInput
                     value={maxUnitSeconds}
                     min={10}
@@ -1011,7 +1022,7 @@ export function PublishPage() {
                   />
                 </label>
                 <label className="field">
-                  <span>截止时间</span>
+                  <span>{t('publish.deadline')}</span>
                   <input
                     type="datetime-local"
                     value={deadlineAt}
@@ -1020,7 +1031,7 @@ export function PublishPage() {
                 </label>
               </div>
               <fieldset className="field">
-                <legend>开放方式</legend>
+                <legend>{t('publish.launchLegend')}</legend>
                 <div className="delivery-target-grid">
                   <button
                     type="button"
@@ -1031,8 +1042,8 @@ export function PublishPage() {
                   >
                     <ShieldCheck aria-hidden="true" />
                     <span>
-                      <strong>先试跑</strong>
-                      <small>最多 3 条，通过后再放剩余</small>
+                      <strong>{t('publish.pilotTitle')}</strong>
+                      <small>{t('publish.pilotDetail')}</small>
                     </span>
                   </button>
                   <button
@@ -1044,15 +1055,15 @@ export function PublishPage() {
                   >
                     <ArrowRight aria-hidden="true" />
                     <span>
-                      <strong>立即开放</strong>
-                      <small>全部进入可领取</small>
+                      <strong>{t('publish.immediateTitle')}</strong>
+                      <small>{t('publish.immediateDetail')}</small>
                     </span>
                   </button>
                 </div>
               </fieldset>
               {launchMode === 'pilot' ? (
                 <label className="field">
-                  <span>试跑条数</span>
+                  <span>{t('publish.pilotCount')}</span>
                   <NumberDraftInput
                     value={pilotUnits}
                     min={1}
@@ -1062,13 +1073,15 @@ export function PublishPage() {
                 </label>
               ) : null}
               <p className={`contract-budget${budgetShort ? ' contract-budget-short' : ''}`}>
-                将锁定 <strong>{points(budget)}</strong>
-                {wallet ? ` · 可用 ${points(wallet.purchasedAvailable)}` : null}
+                {t('publish.willLock')} <strong>{credits(budget)}</strong>
+                {wallet
+                  ? ` · ${t('publish.available', { amount: credits(wallet.purchasedAvailable) })}`
+                  : null}
                 {budgetShort ? (
                   <>
                     {' '}
-                    · 不够发布。
-                    <Link to="/app/wallet">去积分页增加</Link>
+                    · {t('publish.shortPublish')}
+                    <Link to="/app/wallet">{t('publish.goTopUp')}</Link>
                   </>
                 ) : null}
               </p>
@@ -1080,55 +1093,63 @@ export function PublishPage() {
           <div className="contract-stage">
             <article className="contract-primary">
               <header>
-                <span className="contract-kicker">确认</span>
+                <span className="contract-kicker">{t('publish.confirmKicker')}</span>
                 <h2>{effectiveTitle}</h2>
                 <p>
-                  {unitCount.toLocaleString('zh-CN')} 条 · {effectiveAgent} / {effectiveModel} ·{' '}
-                  {ACCEPTANCE_LABEL[effectiveAcceptance]}
+                  {t('publish.confirmMeta', {
+                    count: formatInteger(unitCount),
+                    agent: effectiveAgent,
+                    model: effectiveModel,
+                    acceptance: t(ACCEPTANCE_KEYS[effectiveAcceptance]),
+                  })}
                 </p>
               </header>
               <dl className="contract-confirm">
                 <div>
-                  <dt>数据</dt>
+                  <dt>{t('publish.data')}</dt>
                   <dd>
                     {source === 'work'
-                      ? `工作包 ${workPreview?.urlHost ?? ''}`
+                      ? t('publish.dataWork', { host: workPreview?.urlHost ?? '' })
                       : source === 'https'
-                        ? `JSONL ${datasetHost ?? ''}`
-                        : '粘贴在平台内'}
+                        ? t('publish.dataJsonl', { host: datasetHost ?? '' })
+                        : t('publish.dataInline')}
                   </dd>
                 </div>
                 <div>
-                  <dt>单价</dt>
-                  <dd>{points(rewardPerUnit)}</dd>
+                  <dt>{t('publish.unitPrice')}</dt>
+                  <dd>{credits(rewardPerUnit)}</dd>
                 </div>
                 <div>
-                  <dt>锁定</dt>
-                  <dd>{points(budget)}</dd>
+                  <dt>{t('publish.locked')}</dt>
+                  <dd>{credits(budget)}</dd>
                 </div>
                 <div>
-                  <dt>同时领取</dt>
+                  <dt>{t('publish.concurrent')}</dt>
                   <dd>{requiredConcurrency}</dd>
                 </div>
                 <div>
-                  <dt>截止</dt>
+                  <dt>{t('publish.deadlineLabel')}</dt>
                   <dd>{fullDateTime(deadlineIso(deadlineAt))}</dd>
                 </div>
                 <div>
-                  <dt>开放</dt>
-                  <dd>{launchMode === 'pilot' ? `先试跑 ${pilotUnits} 条` : '立即全部开放'}</dd>
+                  <dt>{t('publish.launch')}</dt>
+                  <dd>
+                    {launchMode === 'pilot'
+                      ? t('publish.launchPilot', { count: pilotUnits })
+                      : t('publish.launchAll')}
+                  </dd>
                 </div>
               </dl>
               {quoteNote ? <p className="contract-quote">{quoteNote}</p> : null}
               {budgetShort ? (
                 <p className="contract-budget contract-budget-short">
-                  积分不够，还差 {points(budget - purchasedAvailable)}。
-                  <Link to="/app/wallet">去积分页增加</Link>
+                  {t('publish.shortBy', { amount: credits(budget - purchasedAvailable) })}
+                  <Link to="/app/wallet">{t('publish.goTopUp')}</Link>
                 </p>
               ) : null}
               <p className="contract-seal">
                 <LockKeyhole aria-hidden="true" />
-                不会自动派单。领取必须由 Runner 主人显式确认。
+                {t('publish.sealNoDispatch')}
               </p>
             </article>
           </div>
@@ -1142,7 +1163,7 @@ export function PublishPage() {
                 type="button"
                 onClick={() => setStep(step - 1)}
               >
-                <ArrowLeft aria-hidden="true" /> 上一步
+                <ArrowLeft aria-hidden="true" /> {t('publish.back')}
               </button>
             ) : (
               <span />
@@ -1154,7 +1175,7 @@ export function PublishPage() {
                 disabled={checking || (step === 2 && budgetShort)}
                 onClick={() => void next()}
               >
-                下一步 <ArrowRight aria-hidden="true" />
+                {t('publish.next')} <ArrowRight aria-hidden="true" />
               </button>
             ) : (
               <button
@@ -1163,7 +1184,9 @@ export function PublishPage() {
                 disabled={publishing || budgetShort}
                 onClick={() => void publish()}
               >
-                {publishing ? '正在发布…' : `锁定 ${points(budget)} 并发布`}
+                {publishing
+                  ? t('publish.publishing')
+                  : t('publish.lockAndPublish', { amount: credits(budget) })}
               </button>
             )}
           </div>

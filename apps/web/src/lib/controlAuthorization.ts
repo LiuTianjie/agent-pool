@@ -1,3 +1,4 @@
+import { t } from '../i18n/translate';
 import type { ControlDevicePreview, ControlScope } from './types';
 
 export interface ControlScopePresentation {
@@ -6,76 +7,84 @@ export interface ControlScopePresentation {
   risk: 'standard' | 'high';
 }
 
-const CONTROL_SCOPE_PRESENTATIONS: Record<ControlScope, ControlScopePresentation> = {
+const CONTROL_SCOPE_META: Record<
+  ControlScope,
+  { label: Parameters<typeof t>[0]; detail: Parameters<typeof t>[0]; risk: 'standard' | 'high' }
+> = {
   'account:read': {
-    label: '查看账户',
-    detail: '查看你的账户信息。',
+    label: 'scopes.accountRead',
+    detail: 'scopes.accountReadDetail',
     risk: 'standard',
   },
   'pools:read': {
-    label: '查看任务',
-    detail: '查看你发布的任务和结果。',
+    label: 'scopes.poolsRead',
+    detail: 'scopes.poolsReadDetail',
     risk: 'standard',
   },
   'pools:write': {
-    label: '管理任务',
-    detail: '发布、取消任务，并确认结果。',
+    label: 'scopes.poolsWrite',
+    detail: 'scopes.poolsWriteDetail',
     risk: 'high',
   },
   'wallet:read': {
-    label: '查看余额',
-    detail: '查看积分和流水。',
+    label: 'scopes.walletRead',
+    detail: 'scopes.walletReadDetail',
     risk: 'standard',
   },
   'wallet:write': {
-    label: '操作资金',
-    detail: '增加或转出积分。',
+    label: 'scopes.walletWrite',
+    detail: 'scopes.walletWriteDetail',
     risk: 'high',
   },
   'runners:read': {
-    label: '查看机器',
-    detail: '查看已连接机器的状态。',
+    label: 'scopes.runnersRead',
+    detail: 'scopes.runnersReadDetail',
     risk: 'standard',
   },
   'runners:pair': {
-    label: '连接机器',
-    detail: '代你批准一台新机器连上来。',
+    label: 'scopes.runnersPair',
+    detail: 'scopes.runnersPairDetail',
     risk: 'high',
   },
   'fleet:read': {
-    label: '查看官方节点',
-    detail: '查看官方节点的状态。',
+    label: 'scopes.fleetRead',
+    detail: 'scopes.fleetReadDetail',
     risk: 'standard',
   },
   'fleet:write': {
-    label: '管理官方节点',
-    detail: '开关你名下的官方节点。',
+    label: 'scopes.fleetWrite',
+    detail: 'scopes.fleetWriteDetail',
     risk: 'high',
   },
   'profile:write': {
-    label: '修改资料',
-    detail: '改显示名称。',
+    label: 'scopes.profileWrite',
+    detail: 'scopes.profileWriteDetail',
     risk: 'standard',
   },
   'events:read': {
-    label: '订阅动态',
-    detail: '持续查看任务和账户动态。',
+    label: 'scopes.eventsRead',
+    detail: 'scopes.eventsReadDetail',
     risk: 'standard',
   },
   'credentials:read': {
-    label: '查看控制凭证',
-    detail: '查看已授权的程序。',
+    label: 'scopes.credentialsRead',
+    detail: 'scopes.credentialsReadDetail',
     risk: 'standard',
   },
   'credentials:write': {
-    label: '撤销控制凭证',
-    detail: '关掉其他程序的授权。',
+    label: 'scopes.credentialsWrite',
+    detail: 'scopes.credentialsWriteDetail',
     risk: 'high',
   },
 };
 
 export function controlScopePresentation(scope: ControlScope): ControlScopePresentation {
-  return CONTROL_SCOPE_PRESENTATIONS[scope];
+  const meta = CONTROL_SCOPE_META[scope];
+  return {
+    label: t(meta.label),
+    detail: t(meta.detail),
+    risk: meta.risk,
+  };
 }
 
 export function highRiskControlScopes(scopes: ControlScope[]): ControlScope[] {
@@ -90,8 +99,8 @@ export function controlPreviewNeedsRiskConfirmation(
 
 export function formatCredentialTtl(totalSeconds: number): string {
   const seconds = Math.max(0, Math.floor(totalSeconds));
-  if (seconds % 86_400 === 0) return `${seconds / 86_400} 天`;
-  if (seconds % 3_600 === 0) return `${seconds / 3_600} 小时`;
-  if (seconds >= 3_600) return `${Math.round(seconds / 3_600)} 小时`;
-  return `${Math.max(1, Math.round(seconds / 60))} 分钟`;
+  if (seconds % 86_400 === 0) return t('format.ttlDays', { n: seconds / 86_400 });
+  if (seconds % 3_600 === 0) return t('format.ttlHours', { n: seconds / 3_600 });
+  if (seconds >= 3_600) return t('format.ttlHours', { n: Math.round(seconds / 3_600) });
+  return t('format.ttlMinutes', { n: Math.max(1, Math.round(seconds / 60)) });
 }

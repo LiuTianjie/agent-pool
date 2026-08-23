@@ -12,7 +12,9 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Brand } from '../components/Brand';
 import { DocumentTitle } from '../components/DocumentTitle';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { InlineError } from '../components/LoadingState';
+import { useI18n } from '../i18n';
 import {
   controlPreviewNeedsRiskConfirmation,
   controlScopePresentation,
@@ -20,20 +22,13 @@ import {
   highRiskControlScopes,
 } from '../lib/controlAuthorization';
 import { api, ApiError } from '../lib/api';
+import { credentialDate } from '../lib/format';
 import type { DeviceApprovalResult, DevicePreview } from '../lib/types';
 
 type ApprovalState = 'idle' | 'approved' | 'denied';
 
-function formatExpiry(value: string): string {
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value));
-}
-
 export function DeviceApprovalPage() {
+  const { t, join } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialCode = searchParams.get('code') || '';
   const requestedKind: DevicePreview['kind'] =
@@ -62,7 +57,7 @@ export function DeviceApprovalPage() {
   const prepare = async (candidate: string) => {
     const normalized = candidate.replace(/[^A-Z0-9-]/gi, '').toUpperCase();
     if (normalized.length < 8 || normalized.length > 9) {
-      setError('设备码应为 8–9 个字符');
+      setError(t('device.codeLength'));
       return;
     }
     const requestId = previewRequestId.current + 1;
@@ -85,12 +80,14 @@ export function DeviceApprovalPage() {
           ? await api.previewControlDevice(normalized)
           : await api.previewRunnerDevice(normalized);
       if (result.kind !== requestedKind) {
-        throw new ApiError('授权请求类型与当前页面不一致，请回到终端重新打开链接', 409);
+        throw new ApiError(t('device.kindMismatch'), 409);
       }
       if (previewRequestId.current === requestId) setPreview(result);
     } catch (requestError) {
       if (previewRequestId.current === requestId) {
-        setError(requestError instanceof ApiError ? requestError.message : '无法核对设备');
+        setError(
+          requestError instanceof ApiError ? requestError.message : t('device.previewFailed'),
+        );
       }
     } finally {
       if (previewRequestId.current === requestId) setPreviewing(false);
@@ -118,12 +115,12 @@ export function DeviceApprovalPage() {
           ? await api.approveControlDevice(code, preview.approvalContext)
           : await api.approveRunnerDevice(code, preview);
       if (result.kind !== preview.kind) {
-        throw new ApiError('授权请求在确认时发生变化，请重新核对设备码', 409);
+        throw new ApiError(t('device.changedOnApprove'), 409);
       }
       setApprovalResult(result);
       setApprovalState('approved');
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : '无法批准设备');
+      setError(requestError instanceof ApiError ? requestError.message : t('device.approveFailed'));
     } finally {
       setApproving(false);
     }
@@ -138,7 +135,7 @@ export function DeviceApprovalPage() {
       setDeniedLabel(result.label);
       setApprovalState('denied');
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : '无法拒绝授权请求');
+      setError(requestError instanceof ApiError ? requestError.message : t('device.denyFailed'));
     } finally {
       setDenying(false);
     }
@@ -146,16 +143,19 @@ export function DeviceApprovalPage() {
 
   const isControl = preview?.kind === 'control' || (!preview && requestedKind === 'control');
   const backTarget = isControl ? '/app/settings' : '/app/run';
-  const backLabel = isControl ? '返回账户设置' : '返回 Runner 页面';
+  const backLabel = isControl ? t('device.backSettings') : t('device.backRunner');
 
   return (
     <main className={`device-page${isControl ? ' device-page-control' : ''}`}>
-      <DocumentTitle title="确认设备" />
+      <DocumentTitle title={t('device.title')} />
       <header>
         <Brand />
-        <Link to={backTarget}>
-          <ArrowLeft aria-hidden="true" /> {backLabel}
-        </Link>
+        <div className="device-header-actions">
+          <LanguageSwitcher compact />
+          <Link to={backTarget}>
+            <ArrowLeft aria-hidden="true" /> {backLabel}
+          </Link>
+        </div>
       </header>
       <section className={`device-card${isControl ? ' device-card-control' : ''}`}>
         {approvalState === 'approved' && approvalResult ? (
@@ -163,17 +163,23 @@ export function DeviceApprovalPage() {
             <span className="approval-ring">
               <CheckCircle2 aria-hidden="true" />
             </span>
-            <h1>{approvalResult.kind === 'control' ? '控制 Agent 已连接' : '设备已连接'}</h1>
+            <h1>
+              {approvalResult.kind === 'control'
+                ? t('device.approvedControl')
+                : t('device.approvedRunner')}
+            </h1>
             {approvalResult.kind === 'control' ? (
-              <p>{approvalResult.label} 只能做刚才列出的事。之后可以在设置里关掉。</p>
+              <p>{t('device.approvedControlBody', { label: approvalResult.label })}</p>
             ) : (
-              <p>{approvalResult.label} 已连上。可以回到终端继续。</p>
+              <p>{t('device.approvedRunnerBody', { label: approvalResult.label })}</p>
             )}
             <Link
               className="button button-primary"
               to={approvalResult.kind === 'control' ? '/app/settings' : '/app/run'}
             >
-              {approvalResult.kind === 'control' ? '管理控制 Agent' : '查看执行节点'}
+              {approvalResult.kind === 'control'
+                ? t('device.manageControl')
+                : t('device.viewNodes')}
             </Link>
           </div>
         ) : approvalState === 'denied' ? (
@@ -181,26 +187,23 @@ export function DeviceApprovalPage() {
             <span className="approval-ring">
               <XCircle aria-hidden="true" />
             </span>
-            <h1>授权已拒绝</h1>
+            <h1>{t('device.deniedTitle')}</h1>
             <p>
-              {deniedLabel ? `${deniedLabel} 未获得任何平台权限。` : '这个请求未获得任何平台权限。'}
-              如果这不是你发起的，可以直接关闭页面。
+              {deniedLabel
+                ? t('device.deniedBody', { label: deniedLabel })
+                : t('device.deniedBodyGeneric')}
             </p>
             <Link className="button button-secondary" to="/app/settings">
-              返回账户设置
+              {t('device.backSettings')}
             </Link>
           </div>
         ) : (
           <>
-            <h1>{isControl ? '让程序代你操作' : '连上这台机器'}</h1>
-            <p>
-              {isControl
-                ? '先看它要做什么。没列出的，它做不了。'
-                : '输入终端里的设备码。批准只连上这台机器，不会交出模型登录。'}
-            </p>
+            <h1>{isControl ? t('device.headingControl') : t('device.headingRunner')}</h1>
+            <p>{isControl ? t('device.leadControl') : t('device.leadRunner')}</p>
             <form className="device-code-form" onSubmit={submitCode}>
               <label>
-                <span>一次性设备码</span>
+                <span>{t('device.codeLabel')}</span>
                 <input
                   value={code}
                   onChange={(event) => {
@@ -222,7 +225,7 @@ export function DeviceApprovalPage() {
                 type="submit"
                 disabled={!code || previewing}
               >
-                {previewing ? '正在核对…' : '继续核对'}
+                {previewing ? t('device.previewing') : t('device.continueCheck')}
               </button>
             </form>
             {error ? <InlineError message={error} /> : null}
@@ -245,49 +248,53 @@ export function DeviceApprovalPage() {
                   <span>
                     <small>
                       {preview.kind === 'control'
-                        ? '控制凭证 · 账户操作'
+                        ? t('device.identControl')
                         : preview.operatorType === 'official'
-                          ? '官方机队 · 平台执行凭证'
-                          : '社区 Runner · 执行凭证'}
+                          ? t('device.identOfficial')
+                          : t('device.identCommunity')}
                     </small>
                     <strong>{preview.label}</strong>
                   </span>
                 </div>
                 <dl>
                   <div>
-                    <dt>设备码</dt>
+                    <dt>{t('device.deviceCode')}</dt>
                     <dd>{code}</dd>
                   </div>
                   {preview.kind === 'control' ? (
                     <>
                       <div>
-                        <dt>凭证类型</dt>
-                        <dd>账户控制</dd>
+                        <dt>{t('device.credType')}</dt>
+                        <dd>{t('device.credControl')}</dd>
                       </div>
                       <div>
-                        <dt>请求能力</dt>
-                        <dd>{preview.scopes.length} 项</dd>
+                        <dt>{t('device.requestedCaps')}</dt>
+                        <dd>{t('device.capCount', { count: preview.scopes.length })}</dd>
                       </div>
                       <div>
-                        <dt>凭证有效期</dt>
+                        <dt>{t('device.credTtl')}</dt>
                         <dd>{formatCredentialTtl(preview.requestedTtlSeconds)}</dd>
                       </div>
                     </>
                   ) : (
                     <>
                       <div>
-                        <dt>凭证类型</dt>
-                        <dd>{preview.operatorType === 'official' ? '官方' : '社区'}</dd>
+                        <dt>{t('device.credType')}</dt>
+                        <dd>
+                          {preview.operatorType === 'official'
+                            ? t('common.official')
+                            : t('common.community')}
+                        </dd>
                       </div>
                       <div>
-                        <dt>客户端</dt>
+                        <dt>{t('device.client')}</dt>
                         <dd>{preview.client}</dd>
                       </div>
                     </>
                   )}
                   <div>
-                    <dt>设备码失效</dt>
-                    <dd>{formatExpiry(preview.expiresAt)}</dd>
+                    <dt>{t('device.codeExpires')}</dt>
+                    <dd>{credentialDate(preview.expiresAt)}</dd>
                   </div>
                 </dl>
 
@@ -296,13 +303,13 @@ export function DeviceApprovalPage() {
                     <section className="device-capabilities" aria-labelledby="capability-title">
                       <header>
                         <span>
-                          <small>请求的能力</small>
-                          <strong id="capability-title">这个 Agent 可以做什么</strong>
+                          <small>{t('device.capsTitle')}</small>
+                          <strong id="capability-title">{t('device.capsHeading')}</strong>
                         </span>
                         {highRiskScopes.length > 0 ? (
-                          <em>{highRiskScopes.length} 项高风险</em>
+                          <em>{t('device.highRiskCount', { count: highRiskScopes.length })}</em>
                         ) : (
-                          <em className="is-safe">只读 / 低风险</em>
+                          <em className="is-safe">{t('device.readOnly')}</em>
                         )}
                       </header>
                       <ul>
@@ -341,12 +348,12 @@ export function DeviceApprovalPage() {
                       <p>
                         <strong>
                           {highRiskScopes.length > 0
-                            ? '这不是只读授权。'
-                            : '权限被限制在上方清单内。'}
+                            ? t('device.notReadOnly')
+                            : t('device.limited')}
                         </strong>
                         {highRiskScopes.length > 0
-                          ? ' 它可以改你的账户。只批准你刚刚自己打开、并且信得过的那个。'
-                          : ' 它只能做上面列出的事，拿不到模型登录。'}
+                          ? ` ${t('device.notReadOnlyDetail')}`
+                          : ` ${t('device.limitedDetail')}`}
                       </p>
                     </div>
                     {highRiskScopes.length > 0 ? (
@@ -357,10 +364,11 @@ export function DeviceApprovalPage() {
                           onChange={(event) => setRiskConfirmed(event.target.checked)}
                         />
                         <span>
-                          我确认这是我刚刚发起的控制 Agent，并理解它可以
-                          {highRiskScopes
-                            .map((scope) => controlScopePresentation(scope).label)
-                            .join('、')}
+                          {t('device.confirmControl', {
+                            actions: join(
+                              highRiskScopes.map((scope) => controlScopePresentation(scope).label),
+                            ),
+                          })}
                         </span>
                       </label>
                     ) : null}
@@ -371,7 +379,7 @@ export function DeviceApprovalPage() {
                         disabled={approving || denying}
                         onClick={() => void deny()}
                       >
-                        {denying ? '正在拒绝…' : '拒绝请求'}
+                        {denying ? t('device.denying') : t('device.deny')}
                       </button>
                       <button
                         className={`button ${
@@ -381,7 +389,7 @@ export function DeviceApprovalPage() {
                         disabled={approving || denying || (needsRiskConfirmation && !riskConfirmed)}
                         onClick={() => void approve()}
                       >
-                        {approving ? '正在授权…' : '授权这些能力'}
+                        {approving ? t('device.authorizing') : t('device.authorize')}
                       </button>
                     </div>
                   </>
@@ -390,8 +398,7 @@ export function DeviceApprovalPage() {
                     <div className="device-safety device-safety-official">
                       <AlertTriangle aria-hidden="true" />
                       <p>
-                        <strong>这是官方节点。</strong>
-                        批准后它可以代官方账户领任务。只批准你刚刚自己打开的那个。
+                        <strong>{t('device.officialWarn')}</strong> {t('device.officialWarnDetail')}
                       </p>
                     </div>
                     <label className="device-official-confirm">
@@ -400,7 +407,7 @@ export function DeviceApprovalPage() {
                         checked={riskConfirmed}
                         onChange={(event) => setRiskConfirmed(event.target.checked)}
                       />
-                      <span>我确认终端明确显示官方机队，并且设备码与上方一致</span>
+                      <span>{t('device.confirmOfficial')}</span>
                     </label>
                     <button
                       className="button button-primary button-wide"
@@ -408,7 +415,7 @@ export function DeviceApprovalPage() {
                       disabled={approving || !riskConfirmed}
                       onClick={() => void approve()}
                     >
-                      {approving ? '正在连接…' : '批准官方节点'}
+                      {approving ? t('device.connecting') : t('device.approveOfficial')}
                     </button>
                   </>
                 ) : (
@@ -416,8 +423,8 @@ export function DeviceApprovalPage() {
                     <div className="device-safety">
                       <ShieldCheck aria-hidden="true" />
                       <p>
-                        <strong>这是普通机器。</strong>
-                        批准后只连上它。要做任务，还得再运行领取命令。
+                        <strong>{t('device.communityWarn')}</strong>{' '}
+                        {t('device.communityWarnDetail')}
                       </p>
                     </div>
                     <button
@@ -426,7 +433,7 @@ export function DeviceApprovalPage() {
                       disabled={approving}
                       onClick={() => void approve()}
                     >
-                      {approving ? '正在连接…' : '批准这台机器'}
+                      {approving ? t('device.connecting') : t('device.approveMachine')}
                     </button>
                   </>
                 )}

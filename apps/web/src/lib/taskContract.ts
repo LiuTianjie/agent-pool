@@ -6,6 +6,8 @@ import type {
   TaskCapsule as SharedTaskCapsule,
 } from '@agent-pool/shared';
 import { INLINE_UNIT_MAX, isHostedUrl } from '@agent-pool/shared';
+import { getLocale, listJoin } from '../i18n/locale';
+import { t } from '../i18n/translate';
 import type { TaskUnitDraft } from './unitTypes';
 
 export { DATASET_UNIT_MAX, INLINE_UNIT_MAX, type DatasetSource } from '@agent-pool/shared';
@@ -72,13 +74,15 @@ export function parseJsonObject(raw: string): JsonObjectParseResult {
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return { error: '必须是 JSON 对象' };
+      return { error: t('contract.mustBeObject') };
     }
     return { value: parsed as Record<string, unknown> };
   } catch (error) {
     return {
       error:
-        error instanceof Error ? error.message.replace(/^JSON\.parse:\s*/i, '') : 'JSON 语法错误',
+        error instanceof Error
+          ? error.message.replace(/^JSON\.parse:\s*/i, '')
+          : t('contract.jsonSyntax'),
     };
   }
 }
@@ -112,8 +116,10 @@ export function unitReferenceIssues(units: TaskUnitDraft[]): string[] {
     seen.add(reference);
   }
   const issues: string[] = [];
-  if (missing) issues.push(`${missing} 条任务缺少外部引用 ID`);
-  if (duplicates.size) issues.push(`外部引用 ID 重复：${[...duplicates].slice(0, 3).join('、')}`);
+  if (missing) issues.push(t('contract.missingRefs', { count: missing }));
+  if (duplicates.size) {
+    issues.push(t('contract.dupRefs', { ids: listJoin([...duplicates].slice(0, 3), getLocale()) }));
+  }
   return issues;
 }
 
@@ -126,9 +132,9 @@ export function acceptanceChecks(
     return [
       {
         id: 'manual',
-        label: '人工确认',
-        detail: '你看过结果后再决定。',
-        coverage: '人工',
+        label: t('contract.acceptManual'),
+        detail: t('contract.acceptManualDetail'),
+        coverage: t('contract.acceptManualCoverage'),
         ready: true,
       },
     ];
@@ -137,9 +143,9 @@ export function acceptanceChecks(
     return [
       {
         id: 'receipt',
-        label: '由你的地址确认',
-        detail: '结果发到你给的地址，由那边确认。',
-        coverage: '每次确认',
+        label: t('contract.acceptWebhook'),
+        detail: t('contract.acceptWebhookDetail'),
+        coverage: t('contract.acceptWebhookCoverage'),
         ready: true,
       },
     ];
@@ -148,26 +154,26 @@ export function acceptanceChecks(
   const checks: AcceptanceCheckView[] = [
     {
       id: 'non_empty',
-      label: '结果非空',
-      detail: '有内容就算。',
-      coverage: '全部任务',
+      label: t('contract.acceptNonEmpty'),
+      detail: t('contract.acceptNonEmptyDetail'),
+      coverage: t('contract.acceptNonEmptyCoverage'),
       ready: true,
     },
   ];
   if (mode === 'schema' || mode === 'schema_and_hidden_exact') {
     checks.push({
       id: 'schema',
-      label: '按格式检查',
-      detail: '只看字段对不对。',
-      coverage: '全部任务',
+      label: t('contract.acceptSchema'),
+      detail: t('contract.acceptSchemaDetail'),
+      coverage: t('contract.acceptNonEmptyCoverage'),
       ready: schemaReady,
     });
   }
   if (mode === 'hidden_exact' || mode === 'schema_and_hidden_exact') {
     checks.push({
       id: 'hidden_exact',
-      label: '与预设答案一致',
-      detail: '要和你给的答案一样。',
+      label: t('contract.acceptHidden'),
+      detail: t('contract.acceptHiddenDetail'),
       coverage: `${coverage.covered}/${coverage.total} · ${coverage.percent}%`,
       ready: coverage.total > 0 && coverage.covered === coverage.total,
     });
@@ -274,7 +280,7 @@ export function localExampleWorkUrl(origin = window.location.origin): string {
 }
 
 export function inlineUnitLimitMessage(): string {
-  return '粘贴导入的条数超出当前上限，请改用 HTTPS 地址';
+  return t('contract.inlineLimit');
 }
 
 export function assertInlineUnitCount(count: number): void {
@@ -341,7 +347,7 @@ export function webhookHostname(value: string): string {
   try {
     return new URL(value).hostname;
   } catch {
-    return '未配置域名';
+    return t('contract.noHostname');
   }
 }
 

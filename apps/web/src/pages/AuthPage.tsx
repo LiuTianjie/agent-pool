@@ -16,7 +16,9 @@ import { type CSSProperties, type FormEvent, useEffect, useMemo, useState } from
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Brand } from '../components/Brand';
 import { DocumentTitle } from '../components/DocumentTitle';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { useAuth } from '../context/AuthContext';
+import { useI18n } from '../i18n';
 import { ApiError } from '../lib/api';
 import { identitySignal, networkHandle, networkShortId } from '../lib/identity';
 import { safeAppPath } from '../lib/navigation';
@@ -49,30 +51,31 @@ function PoolPass({
   displayName: string;
   connection: ConnectionState;
 }) {
+  const { t } = useI18n();
   const handle = networkHandle(displayName);
   const shortId = networkShortId(displayName);
   const signal = useMemo(() => identitySignal(displayName), [displayName]);
   const ready = displayName.trim().length >= 2;
   const status =
     connection === 'connected'
-      ? '已入网'
+      ? t('auth.statusJoined')
       : connection === 'connecting'
-        ? '正在连接'
+        ? t('auth.statusConnecting')
         : ready
-          ? '身份已备好'
-          : '等待输入';
+          ? t('auth.statusReady')
+          : t('auth.statusWaiting');
 
   return (
     <div
       className={`network-pass network-pass-${connection} ${ready ? 'network-pass-ready' : ''}`}
-      aria-label={`入网证，网络身份 @${handle}，短 ID ${shortId}，状态 ${status}`}
+      aria-label={t('auth.passAria', { handle, shortId, status })}
     >
       <header>
         <div className="pass-title">
           <Fingerprint aria-hidden="true" />
           <span>
-            <strong>入网证</strong>
-            <small>网络身份 / 内测</small>
+            <strong>{t('auth.passTitle')}</strong>
+            <small>{t('auth.passSub')}</small>
           </span>
         </div>
         <span className="pass-status">
@@ -81,7 +84,7 @@ function PoolPass({
       </header>
 
       <div className="pass-identity" aria-live="polite">
-        <span>代号</span>
+        <span>{t('auth.passHandle')}</span>
         <strong>@{handle}</strong>
         <small>AP-{shortId}</small>
       </div>
@@ -94,9 +97,9 @@ function PoolPass({
 
       <footer>
         <span>
-          <RadioTower aria-hidden="true" /> 现场身份
+          <RadioTower aria-hidden="true" /> {t('auth.passLive')}
         </span>
-        <span>由 Agent Pool 签发</span>
+        <span>{t('auth.passIssued')}</span>
         <strong>{shortId}</strong>
       </footer>
       <span className="pass-corner" aria-hidden="true" />
@@ -106,6 +109,7 @@ function PoolPass({
 
 export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const isRegister = mode === 'register';
+  const { t } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
   const reducedMotion = useReducedMotion();
@@ -128,7 +132,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
     if (isRegister && registerStep === 1) {
       if (displayName.trim().length < 2) {
-        setError('显示名称至少需要 2 个字符');
+        setError(t('auth.displayNameMin'));
         return;
       }
       setRegisterStep(2);
@@ -152,7 +156,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
       }
     } catch (requestError) {
       setConnection('idle');
-      setError(requestError instanceof ApiError ? requestError.message : '提交失败，请稍后重试');
+      setError(requestError instanceof ApiError ? requestError.message : t('auth.submitFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -160,33 +164,36 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
   return (
     <main className={isRegister ? 'auth-page auth-page-register' : 'auth-page'}>
-      <DocumentTitle title={isRegister ? '注册' : '登录'} />
+      <DocumentTitle title={isRegister ? t('auth.register') : t('auth.login')} />
       <Link className="auth-back" to="/">
-        <ArrowLeft aria-hidden="true" /> 返回首页
+        <ArrowLeft aria-hidden="true" /> {t('auth.backHome')}
       </Link>
+      <div className="auth-locale">
+        <LanguageSwitcher />
+      </div>
 
       <section className="auth-brand-panel">
         <Brand />
         {isRegister ? (
           <>
             <div>
-              <span className="section-index">注册</span>
-              <h1>创建账户。</h1>
-              <p>这个账户不管你的模型密钥。</p>
+              <span className="section-index">{t('auth.register')}</span>
+              <h1>{t('auth.registerTitle')}</h1>
+              <p>{t('auth.registerLead')}</p>
             </div>
             <PoolPass displayName={displayName} connection={connection} />
           </>
         ) : (
           <div>
-            <span className="section-index">登录</span>
-            <h1>欢迎回来。</h1>
-            <p>继续看任务和积分。</p>
+            <span className="section-index">{t('auth.login')}</span>
+            <h1>{t('auth.loginTitle')}</h1>
+            <p>{t('auth.loginLead')}</p>
           </div>
         )}
         {!isRegister ? (
           <div className="auth-safety-note">
             <LockKeyhole aria-hidden="true" />
-            <span>登录这个网站，拿不到你的 Codex 或 Claude 密钥。</span>
+            <span>{t('auth.loginSafety')}</span>
           </div>
         ) : null}
       </section>
@@ -211,11 +218,11 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
               </span>
             </div>
             <span className="section-index">@{networkHandle(displayName)}</span>
-            <h2>{connection === 'connected' ? '已经进来了。' : '正在创建账户…'}</h2>
+            <h2>{connection === 'connected' ? t('auth.joinedTitle') : t('auth.joiningTitle')}</h2>
             <p>
               {connection === 'connected'
-                ? `欢迎，@${networkHandle(displayName)}。`
-                : '正在创建账户…'}
+                ? t('auth.joinedBody', { handle: networkHandle(displayName) })
+                : t('auth.joiningBody')}
             </p>
             <div className="join-progress" aria-hidden="true">
               <span />
@@ -224,13 +231,17 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         ) : (
           <form className="auth-form" onSubmit={submit}>
             <div className="form-heading">
-              {isRegister ? <span>{registerStep} / 2</span> : <h2>登录账户</h2>}
+              {isRegister ? (
+                <span>{t('auth.stepOf', { current: registerStep, total: 2 })}</span>
+              ) : (
+                <h2>{t('auth.formLoginTitle')}</h2>
+              )}
             </div>
 
             {isRegister && registerStep === 1 ? (
               <>
                 <label className="field identity-field">
-                  <span>显示名称</span>
+                  <span>{t('auth.displayName')}</span>
                   <span className="input-shell">
                     <UserRound aria-hidden="true" />
                     <input
@@ -240,7 +251,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                       required
                       value={displayName}
                       onChange={(event) => setDisplayName(event.target.value)}
-                      placeholder="例如 Nori 或 北辰…"
+                      placeholder={t('auth.displayPlaceholder')}
                       aria-describedby="identity-live-preview"
                     />
                   </span>
@@ -264,11 +275,11 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                   <CheckCircle2 aria-hidden="true" />
                 </span>
                 <span>
-                  <small>名字已定</small>
+                  <small>{t('auth.nameLocked')}</small>
                   <strong>@{networkHandle(displayName)}</strong>
                 </span>
                 <button type="button" onClick={() => setRegisterStep(1)}>
-                  修改
+                  {t('auth.edit')}
                 </button>
               </div>
             ) : null}
@@ -276,7 +287,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
             {!isRegister || registerStep === 2 ? (
               <>
                 <label className="field">
-                  <span>邮箱</span>
+                  <span>{t('auth.email')}</span>
                   <span className="input-shell">
                     <Mail aria-hidden="true" />
                     <input
@@ -290,7 +301,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                   </span>
                 </label>
                 <label className="field">
-                  <span>密码</span>
+                  <span>{t('auth.password')}</span>
                   <span className="input-shell">
                     <KeyRound aria-hidden="true" />
                     <input
@@ -300,7 +311,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                       required
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
-                      placeholder="至少 12 位…"
+                      placeholder={t('auth.passwordPlaceholder')}
                     />
                   </span>
                 </label>
@@ -310,7 +321,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
             {isRegister && registerStep === 2 ? (
               <div className="register-security-note">
                 <ShieldCheck aria-hidden="true" />
-                <span>这个账户不管你的模型密钥。</span>
+                <span>{t('auth.securityNote')}</span>
               </div>
             ) : null}
 
@@ -327,26 +338,26 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
             >
               {submitting
                 ? isRegister
-                  ? '正在创建…'
-                  : '正在登录…'
+                  ? t('auth.creating')
+                  : t('auth.signingIn')
                 : isRegister
                   ? registerStep === 1
-                    ? '继续'
-                    : '创建账户'
-                  : '登录'}
+                    ? t('auth.continue')
+                    : t('auth.createAccount')
+                  : t('auth.login')}
               {!submitting ? <ArrowRight aria-hidden="true" /> : null}
             </button>
 
             {isRegister && registerStep === 2 ? (
               <button className="auth-step-back" type="button" onClick={() => setRegisterStep(1)}>
-                <ArrowLeft aria-hidden="true" /> 返回改名字
+                <ArrowLeft aria-hidden="true" /> {t('auth.backToName')}
               </button>
             ) : null}
 
             <p className="auth-switch">
-              {isRegister ? '已有账户？' : '还没有账户？'}{' '}
+              {isRegister ? t('auth.hasAccount') : t('auth.noAccount')}{' '}
               <Link to={isRegister ? `/login${location.search}` : `/register${location.search}`}>
-                {isRegister ? '直接登录' : '现在注册'}
+                {isRegister ? t('auth.goLogin') : t('auth.goRegister')}
               </Link>
             </p>
           </form>

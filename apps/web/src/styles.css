@@ -371,8 +371,60 @@ svg {
   gap: 22px;
 }
 
+.locale-switch {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: 1px solid var(--line-bright);
+  background: #0a0e0b;
+}
+
+.locale-switch button {
+  min-width: 28px;
+  padding: 5px 8px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.locale-switch button[aria-pressed='true'] {
+  color: var(--lime-ink);
+  background: var(--lime);
+}
+
+.locale-switch-compact button {
+  min-width: 24px;
+  padding: 4px 6px;
+}
+
+.auth-locale {
+  position: absolute;
+  z-index: 4;
+  top: 28px;
+  right: 32px;
+}
+
+.mobile-header-actions,
+.device-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sidebar-top .locale-switch {
+  width: max-content;
+}
+
 .landing-nav-actions .text-link:not(:last-child) {
   color: var(--text-soft);
+}
+
+html[data-locale='en'] .hero h1 {
+  letter-spacing: -0.045em;
 }
 
 .hero {
@@ -7417,7 +7469,7 @@ code {
   justify-content: space-between;
 }
 
-.device-page > header > a:last-child {
+.device-page > header .device-header-actions > a {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -8152,6 +8204,11 @@ code {
   .auth-back {
     top: 24px;
     left: 18px;
+  }
+
+  .auth-locale {
+    top: 24px;
+    right: 18px;
   }
 
   .auth-page-register {
@@ -8904,11 +8961,11 @@ code {
     padding: 18px;
   }
 
-  .device-page > header > a:last-child {
+  .device-page > header .device-header-actions > a {
     font-size: 0;
   }
 
-  .device-page > header > a:last-child svg {
+  .device-page > header .device-header-actions > a svg {
     width: 20px;
     height: 20px;
   }

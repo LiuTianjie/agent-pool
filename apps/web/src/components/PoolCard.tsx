@@ -1,7 +1,8 @@
 import type { PoolSummary } from '@agent-pool/shared';
 import { ArrowUpRight, Boxes, Clock3, Cpu, Gauge } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { credits, dateTime } from '../lib/format';
+import { useI18n } from '../i18n';
+import { credits, dateTime, formatInteger } from '../lib/format';
 import { PoolStatus, type PoolLifecycleStatus } from './Status';
 
 function completion(pool: PoolSummary): number {
@@ -10,6 +11,7 @@ function completion(pool: PoolSummary): number {
 }
 
 export function PoolCard({ pool }: { pool: PoolSummary }) {
+  const { t } = useI18n();
   const progress = completion(pool);
   const runtimeStatus = pool.status as PoolLifecycleStatus;
 
@@ -28,38 +30,41 @@ export function PoolCard({ pool }: { pool: PoolSummary }) {
         </span>
         <strong>{pool.requestedModel}</strong>
         <span>
-          <Gauge aria-hidden="true" /> 同时执行上限 {pool.requiredConcurrency}
+          <Gauge aria-hidden="true" /> {t('card.concurrency', { count: pool.requiredConcurrency })}
         </span>
       </div>
-      <div className="pool-progress" aria-label={`完成 ${progress}%`}>
+      <div className="pool-progress" aria-label={t('card.progress', { percent: progress })}>
         <span style={{ width: `${progress}%` }} />
       </div>
       <div className="pool-counts">
         <div>
-          <strong>{pool.acceptedUnits.toLocaleString('zh-CN')}</strong>
-          <span>已验收</span>
+          <strong>{formatInteger(pool.acceptedUnits)}</strong>
+          <span>{t('card.accepted')}</span>
         </div>
         <div>
-          <strong>{pool.runningUnits.toLocaleString('zh-CN')}</strong>
-          <span>执行中</span>
+          <strong>{formatInteger(pool.runningUnits)}</strong>
+          <span>{t('card.running')}</span>
         </div>
         <div>
-          <strong>{pool.queuedUnits.toLocaleString('zh-CN')}</strong>
-          <span>排队</span>
+          <strong>{formatInteger(pool.queuedUnits)}</strong>
+          <span>{t('card.queued')}</span>
         </div>
         <div>
-          <strong>{pool.failedUnits.toLocaleString('zh-CN')}</strong>
-          <span>失败</span>
+          <strong>{formatInteger(pool.failedUnits)}</strong>
+          <span>{t('card.failed')}</span>
         </div>
       </div>
       <footer>
         <span>
-          <Boxes aria-hidden="true" /> {pool.totalUnits.toLocaleString('zh-CN')} 条任务
+          <Boxes aria-hidden="true" />{' '}
+          {t('card.unitCount', { count: formatInteger(pool.totalUnits) })}
         </span>
         <span>
-          <Clock3 aria-hidden="true" /> 截止 {dateTime(pool.deadlineAt)}
+          <Clock3 aria-hidden="true" /> {t('card.deadline', { time: dateTime(pool.deadlineAt) })}
         </span>
-        <span className="pool-pulse-reward">{credits(pool.rewardPerUnit)} / 条</span>
+        <span className="pool-pulse-reward">
+          {t('card.perUnit', { amount: credits(pool.rewardPerUnit) })}
+        </span>
         <ArrowUpRight aria-hidden="true" />
       </footer>
     </Link>

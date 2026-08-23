@@ -13,8 +13,9 @@ import {
   Webhook,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useI18n } from '../i18n';
 import { api, ApiError } from '../lib/api';
-import { credits, duration, relativeTime } from '../lib/format';
+import { credits, duration, formatInteger, relativeTime } from '../lib/format';
 import {
   clampClaimUnits,
   matchingMarketPools,
@@ -24,19 +25,21 @@ import {
 import type { RunnerMarketPool, RunnerNodePublic } from '../lib/types';
 import { CopyCommand } from './CopyCommand';
 
-const MARKET_STATUS: Partial<Record<RunnerMarketPool['status'], string>> = {
-  piloting: '试跑中',
-  waiting_capacity: '开放领取',
-  queued: '开放领取',
-  running: '执行中 / 仍可领取',
-};
-
 interface RunnerClaimMarketProps {
   nodes: RunnerNodePublic[];
   pools: RunnerMarketPool[];
   loading: boolean;
   error?: string | null;
   onReload(): void;
+}
+
+function nodeStatusLabel(
+  status: RunnerNodePublic['status'],
+  t: ReturnType<typeof useI18n>['t'],
+): string {
+  if (status === 'online') return t('common.online');
+  if (status === 'paused') return t('common.paused');
+  return t('common.offline');
 }
 
 export function RunnerClaimMarket({
@@ -46,6 +49,7 @@ export function RunnerClaimMarket({
   error,
   onReload,
 }: RunnerClaimMarketProps) {
+  const { t } = useI18n();
   const [nodeId, setNodeId] = useState('');
   const [poolId, setPoolId] = useState('');
   const [units, setUnits] = useState(1);
@@ -73,6 +77,12 @@ export function RunnerClaimMarket({
           Date.parse(certification.expiresAt) > Date.now(),
       )
     : undefined;
+  const marketStatus: Partial<Record<RunnerMarketPool['status'], string>> = {
+    piloting: t('market.piloting'),
+    waiting_capacity: t('market.open'),
+    queued: t('market.open'),
+    running: t('market.running'),
+  };
 
   useEffect(() => {
     if (!nodes.length) {
@@ -115,7 +125,9 @@ export function RunnerClaimMarket({
         expiresAt: result.claim.expiresAt,
       });
     } catch (requestError) {
-      setClaimError(requestError instanceof ApiError ? requestError.message : '无法生成领取单');
+      setClaimError(
+        requestError instanceof ApiError ? requestError.message : t('market.createFailed'),
+      );
     } finally {
       setClaiming(false);
     }
@@ -129,42 +141,48 @@ export function RunnerClaimMarket({
             <Target />
           </span>
           <span>
-            <h2>选一台，领一批</h2>
+            <h2>{t('market.title')}</h2>
           </span>
         </div>
       </header>
 
       <div className="runner-market-rule">
         <RadioTower aria-hidden="true" />
-        <p>网页只生成领取单。真正执行，还要在那台机器上跑命令。</p>
+        <p>{t('market.rule')}</p>
       </div>
 
       {loading ? (
         <div className="runner-market-state" role="status">
-          <RadioTower aria-hidden="true" /> 正在查找可领的任务…
+          <RadioTower aria-hidden="true" /> {t('market.loading')}
         </div>
       ) : error ? (
         <div className="runner-market-state runner-market-error" role="alert">
           <AlertTriangle aria-hidden="true" />
           <span>{error}</span>
           <button className="text-link" type="button" onClick={onReload}>
-            <RefreshCcw aria-hidden="true" /> 重试
+            <RefreshCcw aria-hidden="true" /> {t('common.retry')}
           </button>
         </div>
       ) : !nodes.length ? (
         <div className="runner-market-state">
-          <Bot aria-hidden="true" /> 还没有机器。先完成下面的安装和登录。
+          <Bot aria-hidden="true" /> {t('market.noMachine')}
         </div>
       ) : (
         <div className="runner-market-body">
           <div className="runner-market-picker">
             <label>
-              <span>01 / 用哪台</span>
+              <span>{t('market.pickMachine')}</span>
               <select value={nodeId} onChange={(event) => setNodeId(event.target.value)}>
                 {nodes.map((node) => (
                   <option value={node.id} key={node.id}>
-                    {node.name} · {node.operatorType === 'official' ? '官方' : '社区'} ·{' '}
-                    {node.certifications.length} 份认证
+                    {t('market.optionNode', {
+                      name: node.name,
+                      kind:
+                        node.operatorType === 'official'
+                          ? t('common.official')
+                          : t('common.community'),
+                      certs: node.certifications.length,
+                    })}
                   </option>
                 ))}
               </select>
@@ -176,35 +194,40 @@ export function RunnerClaimMarket({
                 <div>
                   <strong>{selectedNode.name}</strong>
                   <small>
-                    {selectedNode.status === 'online'
-                      ? '在线'
-                      : selectedNode.status === 'paused'
-                        ? '已暂停'
-                        : '离线'}{' '}
-                    · {selectedNode.platform || '未上报平台'} · {selectedNode.id.slice(0, 12)}
+                    {nodeStatusLabel(selectedNode.status, t)} ·{' '}
+                    {selectedNode.platform || t('common.platformUnknownShort')} ·{' '}
+                    {selectedNode.id.slice(0, 12)}
                   </small>
                 </div>
                 <em className={selectedNode.operatorType === 'official' ? 'is-official' : ''}>
                   {selectedNode.operatorType === 'official' ? (
                     <ServerCog aria-hidden="true" />
                   ) : null}
-                  {selectedNode.operatorType === 'official' ? '官方' : '社区'}
+                  {selectedNode.operatorType === 'official'
+                    ? t('common.official')
+                    : t('common.community')}
                 </em>
               </article>
             ) : null}
 
             <label>
-              <span>02 / 领哪一批</span>
+              <span>{t('market.pickBatch')}</span>
               <select
                 value={poolId}
                 disabled={!matchedPools.length}
                 onChange={(event) => setPoolId(event.target.value)}
               >
-                {!matchedPools.length ? <option value="">现在没有可领的</option> : null}
+                {!matchedPools.length ? (
+                  <option value="">{t('market.noneAvailable')}</option>
+                ) : null}
                 {matchedPools.map((pool) => (
                   <option value={pool.id} key={pool.id}>
-                    {pool.owned ? '自己的 · ' : ''}
-                    {pool.title} · {pool.queuedUnits} 条任务 · {credits(pool.rewardPerUnit)}
+                    {t('market.optionPool', {
+                      owned: pool.owned ? t('market.ownPrefix') : '',
+                      title: pool.title,
+                      units: pool.queuedUnits,
+                      reward: credits(pool.rewardPerUnit),
+                    })}
                   </option>
                 ))}
               </select>
@@ -213,7 +236,7 @@ export function RunnerClaimMarket({
             {!matchedPools.length ? (
               <div className="runner-market-no-match">
                 <Cpu aria-hidden="true" />
-                <span>现在没有可领的批次。执行器和模型要对得上，已完成的不会再出现。</span>
+                <span>{t('market.noMatch')}</span>
               </div>
             ) : null}
           </div>
@@ -223,31 +246,39 @@ export function RunnerClaimMarket({
               <header>
                 <div>
                   <span>
-                    {selectedPool.owned ? '自己的任务 · ' : ''}
-                    {MARKET_STATUS[selectedPool.status] || selectedPool.status}
+                    {selectedPool.owned ? t('market.ownTask') : ''}
+                    {marketStatus[selectedPool.status] || selectedPool.status}
                   </span>
                   <h3>{selectedPool.title}</h3>
                 </div>
-                <strong>{credits(selectedPool.rewardPerUnit)} / 条</strong>
+                <strong>
+                  {t('market.perUnit', { amount: credits(selectedPool.rewardPerUnit) })}
+                </strong>
               </header>
               <p>{selectedPool.publicSummary}</p>
               <dl>
                 <div>
-                  <dt>指定执行器</dt>
+                  <dt>{t('market.requestedAdapter')}</dt>
                   <dd>
                     {selectedPool.requestedAgent} / {selectedPool.requestedModel}
                   </dd>
                 </div>
                 <div>
-                  <dt>结果去向</dt>
-                  <dd>{selectedPool.deliveryMode === 'webhook' ? '发到对方地址' : '按契约验收'}</dd>
+                  <dt>{t('market.resultDest')}</dt>
+                  <dd>
+                    {selectedPool.deliveryMode === 'webhook'
+                      ? t('market.destWebhook')
+                      : t('market.destContract')}
+                  </dd>
                 </div>
                 <div>
-                  <dt>现在可领</dt>
-                  <dd>{selectedPool.queuedUnits.toLocaleString('zh-CN')} 条任务</dd>
+                  <dt>{t('market.availableNow')}</dt>
+                  <dd>
+                    {t('market.unitsNow', { count: formatInteger(selectedPool.queuedUnits) })}
+                  </dd>
                 </div>
                 <div>
-                  <dt>同时执行上限</dt>
+                  <dt>{t('market.concurrencyCap')}</dt>
                   <dd>{selectedPool.requiredConcurrency}</dd>
                 </div>
               </dl>
@@ -256,8 +287,8 @@ export function RunnerClaimMarket({
                 <div className="runner-market-owned">
                   <UserRound aria-hidden="true" />
                   <span>
-                    <strong>自己的任务</strong>
-                    <small>可以自己跑通流程。消耗的是发布预算，不会变成收益。</small>
+                    <strong>{t('market.ownTitle')}</strong>
+                    <small>{t('market.ownDetail')}</small>
                   </span>
                 </div>
               ) : null}
@@ -265,12 +296,14 @@ export function RunnerClaimMarket({
               <div className="runner-market-proof">
                 <CheckCircle2 aria-hidden="true" />
                 <span>
-                  <strong>这台对得上</strong>
+                  <strong>{t('market.matchTitle')}</strong>
                   {matchingCertification ? (
                     <small>
-                      P95 {duration(matchingCertification.p95Ms / 1000)} · 并发证据{' '}
-                      {matchingCertification.certifiedConcurrency} ·{' '}
-                      {relativeTime(matchingCertification.expiresAt)}到期
+                      {t('market.certMeta', {
+                        p95: duration(matchingCertification.p95Ms / 1000),
+                        concurrency: matchingCertification.certifiedConcurrency,
+                        expiry: relativeTime(matchingCertification.expiresAt),
+                      })}
                     </small>
                   ) : null}
                 </span>
@@ -280,17 +313,17 @@ export function RunnerClaimMarket({
                 <div className="runner-market-webhook">
                   <Webhook aria-hidden="true" />
                   <span>
-                    <strong>结果发到对方地址</strong>
+                    <strong>{t('market.webhookTitle')}</strong>
                     {selectedNode.operatorType === 'official'
-                      ? '这台已经允许外发。'
-                      : '命令会带上允许外发。'}{' '}
-                    对方看得到你的网络来源。
+                      ? t('market.webhookOfficial')
+                      : t('market.webhookCommunity')}{' '}
+                    {t('market.webhookSource')}
                   </span>
                 </div>
               ) : null}
 
               <label className="runner-market-units">
-                <span>03 / 领几条</span>
+                <span>{t('market.pickCount')}</span>
                 <div>
                   <input
                     type="number"
@@ -301,7 +334,9 @@ export function RunnerClaimMarket({
                     value={units}
                     onChange={(event) => setUnits(Number(event.target.value))}
                   />
-                  <small>条 / 最多 {selectedPool.queuedUnits.toLocaleString('zh-CN')}</small>
+                  <small>
+                    {t('market.unitsMax', { count: formatInteger(selectedPool.queuedUnits) })}
+                  </small>
                 </div>
               </label>
 
@@ -317,10 +352,12 @@ export function RunnerClaimMarket({
                   <div>
                     <TerminalSquare aria-hidden="true" />
                     <span>
-                      <strong>04 / 在 {selectedNode.name} 上运行</strong>
+                      <strong>{t('market.runOn', { name: selectedNode.name })}</strong>
                       <small>
-                        领取单已生成，{createdClaim.maxUnits} 条，
-                        {relativeTime(createdClaim.expiresAt)}前有效。
+                        {t('market.claimReady', {
+                          units: createdClaim.maxUnits,
+                          expiry: relativeTime(createdClaim.expiresAt),
+                        })}
                       </small>
                     </span>
                   </div>
@@ -333,20 +370,22 @@ export function RunnerClaimMarket({
                   disabled={claiming}
                   onClick={() => void createClaim()}
                 >
-                  {claiming ? '正在生成领取单…' : `生成领取单 · ${safeUnits} 条`}
+                  {claiming ? t('market.creating') : t('market.createClaim', { units: safeUnits })}
                 </button>
               )}
 
               <p className="runner-market-pick-alt">
-                也可以在终端自己选：<code>{runnerPickCommand(selectedNode, selectedPool)}</code>
+                {t('market.pickAlt')} <code>{runnerPickCommand(selectedNode, selectedPool)}</code>
               </p>
               <div className="runner-market-return">
                 <Clock3 aria-hidden="true" />
-                这一批最多 {safeUnits} 条
+                {t('market.batchMax', { units: safeUnits })}
                 <span>
                   {selectedPool.owned
-                    ? '自己跑通，不计收益'
-                    : `最多可赚 ${credits(safeUnits * selectedPool.rewardPerUnit)}`}
+                    ? t('market.selfRun')
+                    : t('market.maxEarn', {
+                        amount: credits(safeUnits * selectedPool.rewardPerUnit),
+                      })}
                 </span>
               </div>
             </div>

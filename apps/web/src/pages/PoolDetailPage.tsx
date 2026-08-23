@@ -25,25 +25,21 @@ import { DocumentTitle } from '../components/DocumentTitle';
 import { InlineError, LoadingState } from '../components/LoadingState';
 import { LiveStatus, PoolStatus } from '../components/Status';
 import { useLiveEvents } from '../hooks/useLiveEvents';
+import { useI18n, type MessageKey } from '../i18n';
 import { api, ApiError } from '../lib/api';
-import { credits, duration, fullDateTime, percent, relativeTime } from '../lib/format';
+import {
+  credits,
+  duration,
+  formatInteger,
+  fullDateTime,
+  percent,
+  relativeTime,
+} from '../lib/format';
 import type { PoolDetail, PoolUnit, UnitStatus } from '../lib/types';
 import { webhookHostname } from '../lib/taskContract';
-import { printableValue } from '../lib/units';
 
-const UNIT_STATUS: Record<UnitStatus, string> = {
-  queued: '排队',
-  leased: '执行中',
-  running: '执行中',
-  submitted: '待验收',
-  accepted: '已通过',
-  rejected: '已拒绝',
-  failed: '失败',
-  cancelled: '已取消',
-};
-
-function resultJson(value: unknown): string {
-  if (value === undefined) return '尚无交付内容';
+function resultJson(value: unknown, empty: string): string {
+  if (value === undefined) return empty;
   if (typeof value === 'string') return value;
   try {
     return JSON.stringify(value, null, 2);
@@ -53,6 +49,7 @@ function resultJson(value: unknown): string {
 }
 
 export function PoolDetailPage() {
+  const { t } = useI18n();
   const { poolId = '' } = useParams();
   const [pool, setPool] = useState<PoolDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,6 +66,17 @@ export function PoolDetailPage() {
   const [launching, setLaunching] = useState(false);
   const refreshTimer = useRef<number | undefined>(undefined);
 
+  const unitStatus: Record<UnitStatus, string> = {
+    queued: t('pool.queued'),
+    leased: t('pool.leased'),
+    running: t('pool.running'),
+    submitted: t('pool.submitted'),
+    accepted: t('pool.accepted'),
+    rejected: t('pool.rejected'),
+    failed: t('pool.failed'),
+    cancelled: t('pool.cancelled'),
+  };
+
   const load = useCallback(
     async (quiet = false) => {
       if (!quiet) setLoading(true);
@@ -76,12 +84,12 @@ export function PoolDetailPage() {
         setPool(await api.getPool(poolId));
         setError(null);
       } catch (requestError) {
-        setError(requestError instanceof ApiError ? requestError.message : '无法读取这批任务');
+        setError(requestError instanceof ApiError ? requestError.message : t('pool.loadError'));
       } finally {
         if (!quiet) setLoading(false);
       }
     },
-    [poolId],
+    [poolId, t],
   );
 
   useEffect(() => {
@@ -122,7 +130,7 @@ export function PoolDetailPage() {
       );
       setResultOffset(offset);
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : '无法读取交付结果');
+      setError(requestError instanceof ApiError ? requestError.message : t('pool.resultsError'));
     } finally {
       setResultLoading(false);
     }
@@ -140,12 +148,12 @@ export function PoolDetailPage() {
           decision === 'accept'
             ? undefined
             : decision === 'retry'
-              ? '发布者要求重新执行'
-              : '发布者拒绝了本次交付',
+              ? t('pool.retryNote')
+              : t('pool.rejectNote'),
         ),
       );
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : '验收操作失败');
+      setError(requestError instanceof ApiError ? requestError.message : t('pool.reviewError'));
     } finally {
       setReviewing(null);
     }
@@ -157,7 +165,7 @@ export function PoolDetailPage() {
       setPool(await api.cancelPool(poolId));
       setCancelOpen(false);
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : '取消失败');
+      setError(requestError instanceof ApiError ? requestError.message : t('pool.cancelError'));
     } finally {
       setCancelling(false);
     }
@@ -169,13 +177,13 @@ export function PoolDetailPage() {
     try {
       setPool(await api.launchPool(poolId));
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : '开放剩余任务失败');
+      setError(requestError instanceof ApiError ? requestError.message : t('pool.launchError'));
     } finally {
       setLaunching(false);
     }
   };
 
-  if (loading && !pool) return <LoadingState label="正在读取这批任务" />;
+  if (loading && !pool) return <LoadingState label={t('pool.loading')} />;
   if (error && !pool) return <InlineError message={error} retry={() => void load()} />;
   if (!pool) return null;
 
@@ -207,11 +215,29 @@ export function PoolDetailPage() {
     pilotUnitCount > 0 &&
     pilotAcceptedUnits === pilotUnitCount;
 
+  const acceptanceLabel = (): string => {
+    if (capsule) {
+      const keys: Record<string, MessageKey> = {
+        non_empty: 'pool.acceptNonEmpty',
+        hidden_exact: 'pool.acceptHidden',
+        manual: 'pool.acceptManual',
+        schema: 'pool.acceptSchema',
+        schema_and_hidden_exact: 'pool.acceptBoth',
+        webhook: 'pool.acceptWebhook',
+      };
+      return t(keys[capsule.acceptance.mode] || 'pool.acceptNonEmpty');
+    }
+    if (pool.validationMode === 'auto') {
+      return pool.outputSchema ? t('pool.acceptSchema') : t('pool.acceptNonEmpty');
+    }
+    return t('pool.acceptManual');
+  };
+
   return (
     <div className="page pool-detail-page">
       <DocumentTitle title={pool.title} />
       <Link className="back-link" to="/app">
-        <ArrowLeft aria-hidden="true" /> 返回控制台
+        <ArrowLeft aria-hidden="true" /> {t('pool.back')}
       </Link>
       <header className="pool-detail-header">
         <div>
@@ -225,7 +251,7 @@ export function PoolDetailPage() {
           <LiveStatus state={state} />
           {canCancel ? (
             <Link className="button button-primary button-small" to="/app/run">
-              <RadioTower aria-hidden="true" /> 去领取
+              <RadioTower aria-hidden="true" /> {t('pool.claim')}
             </Link>
           ) : null}
           <button
@@ -233,7 +259,7 @@ export function PoolDetailPage() {
             type="button"
             onClick={() => void load(true)}
           >
-            <RefreshCw aria-hidden="true" /> 刷新
+            <RefreshCw aria-hidden="true" /> {t('pool.refresh')}
           </button>
           {canCancel ? (
             <button
@@ -241,7 +267,7 @@ export function PoolDetailPage() {
               type="button"
               onClick={() => setCancelOpen(true)}
             >
-              <Ban aria-hidden="true" /> 取消这批任务
+              <Ban aria-hidden="true" /> {t('pool.cancelBatch')}
             </button>
           ) : null}
         </div>
@@ -252,17 +278,17 @@ export function PoolDetailPage() {
       <section className="pool-hero-meter">
         <div className="meter-main">
           <div className="meter-number">
-            <strong>{pool.acceptedUnits.toLocaleString('zh-CN')}</strong>
-            <span>/ {pool.totalUnits.toLocaleString('zh-CN')}</span>
+            <strong>{formatInteger(pool.acceptedUnits)}</strong>
+            <span>/ {formatInteger(pool.totalUnits)}</span>
           </div>
-          <small>已通过</small>
+          <small>{t('pool.passed')}</small>
         </div>
         <div className="concurrency-display">
           <div>
             <strong>{activeConcurrency}</strong>
             <span>/ {pool.requiredConcurrency}</span>
           </div>
-          <small>同时执行上限</small>
+          <small>{t('pool.concurrencyCap')}</small>
         </div>
         <div className={deadlineRisk ? 'deadline-display deadline-risk' : 'deadline-display'}>
           <Clock3 aria-hidden="true" />
@@ -276,15 +302,22 @@ export function PoolDetailPage() {
             <Flame />
           </div>
           <div className="pilot-gate-copy">
-            <h2>试跑已全部通过，可以开放剩余任务。</h2>
+            <h2>{t('pool.pilotReady')}</h2>
             <p>
-              {pilotAcceptedUnits}/{pilotUnitCount} 已通过 · {pilotFailedUnits} 失败 ·{' '}
-              {heldUnitCount.toLocaleString('zh-CN')} 条还没开放。
+              {t('pool.pilotStats', {
+                accepted: pilotAcceptedUnits,
+                total: pilotUnitCount,
+                failed: pilotFailedUnits,
+                held: formatInteger(heldUnitCount),
+              })}
             </p>
           </div>
           <div
             className="pilot-gate-meter"
-            aria-label={`试跑 ${pilotAcceptedUnits}/${pilotUnitCount}`}
+            aria-label={t('pool.pilotAria', {
+              accepted: pilotAcceptedUnits,
+              total: pilotUnitCount,
+            })}
           >
             {Array.from({ length: pilotUnitCount }, (_, index) => (
               <i className={index < pilotAcceptedUnits ? 'accepted' : ''} key={index} />
@@ -296,25 +329,25 @@ export function PoolDetailPage() {
             disabled={!canLaunchHeld || launching}
             onClick={() => void launchHeldUnits()}
           >
-            {launching ? '正在开放…' : '开放剩余'} <Rocket aria-hidden="true" />
+            {launching ? t('pool.launching') : t('pool.launchRest')} <Rocket aria-hidden="true" />
           </button>
         </section>
       ) : null}
 
-      <nav className="detail-tabs" aria-label="任务详情">
+      <nav className="detail-tabs" aria-label={t('pool.tabsAria')}>
         <button
           type="button"
           className={tab === 'overview' ? 'active' : ''}
           onClick={() => setTab('overview')}
         >
-          实时进度
+          {t('pool.tabLive')}
         </button>
         <button
           type="button"
           className={tab === 'results' ? 'active' : ''}
           onClick={() => setTab('results')}
         >
-          结果 <span>{pool.submittedUnits + pool.acceptedUnits}</span>
+          {t('pool.tabResults')} <span>{pool.submittedUnits + pool.acceptedUnits}</span>
         </button>
       </nav>
 
@@ -324,7 +357,7 @@ export function PoolDetailPage() {
             <div className="detail-block">
               <div className="section-bar">
                 <div>
-                  <h2>任务要求</h2>
+                  <h2>{t('pool.requirements')}</h2>
                 </div>
               </div>
               <dl className="contract-grid">
@@ -336,48 +369,33 @@ export function PoolDetailPage() {
                 </div>
                 <div>
                   <dt>
-                    <Cpu aria-hidden="true" /> 模型
+                    <Cpu aria-hidden="true" /> {t('pool.model')}
                   </dt>
                   <dd>{pool.requestedModel}</dd>
                 </div>
                 <div>
                   <dt>
-                    <Gauge aria-hidden="true" /> 同时执行上限
+                    <Gauge aria-hidden="true" /> {t('pool.concurrencyCap')}
                   </dt>
                   <dd>{pool.requiredConcurrency}</dd>
                 </div>
                 <div>
                   <dt>
-                    <Clock3 aria-hidden="true" /> 单条任务时限
+                    <Clock3 aria-hidden="true" /> {t('pool.unitLimit')}
                   </dt>
                   <dd>{duration(pool.maxUnitSeconds)}</dd>
                 </div>
                 <div>
                   <dt>
-                    <Boxes aria-hidden="true" /> 单条奖励
+                    <Boxes aria-hidden="true" /> {t('pool.unitReward')}
                   </dt>
                   <dd className="contract-pulse">{credits(pool.rewardPerUnit)}</dd>
                 </div>
                 <div>
                   <dt>
-                    <CheckCircle2 aria-hidden="true" /> 怎样算完
+                    <CheckCircle2 aria-hidden="true" /> {t('pool.howDone')}
                   </dt>
-                  <dd>
-                    {capsule
-                      ? {
-                          non_empty: '结果非空',
-                          hidden_exact: '与预设答案一致',
-                          manual: '人工确认',
-                          schema: '按格式检查',
-                          schema_and_hidden_exact: '格式和答案都要符合',
-                          webhook: '由你的地址确认',
-                        }[capsule.acceptance.mode] || capsule.acceptance.mode
-                      : pool.validationMode === 'auto'
-                        ? pool.outputSchema
-                          ? '按格式检查'
-                          : '结果非空'
-                        : '人工确认'}
-                  </dd>
+                  <dd>{acceptanceLabel()}</dd>
                 </div>
                 <div>
                   <dt>
@@ -386,20 +404,20 @@ export function PoolDetailPage() {
                     ) : (
                       <ShieldCheck aria-hidden="true" />
                     )}{' '}
-                    结果去向
+                    {t('pool.resultDest')}
                   </dt>
-                  <dd>{webhookDelivery ? webhookHostname(webhookUrl) : '按契约验收'}</dd>
+                  <dd>{webhookDelivery ? webhookHostname(webhookUrl) : t('pool.destContract')}</dd>
                 </div>
                 <div>
                   <dt>
-                    <LockKeyhole aria-hidden="true" /> 数据
+                    <LockKeyhole aria-hidden="true" /> {t('pool.data')}
                   </dt>
                   <dd>
                     {pool.datasetMode === 'work'
-                      ? '工作包托管'
+                      ? t('pool.dataWork')
                       : pool.datasetMode === 'https'
-                        ? 'JSONL 托管'
-                        : '粘贴在平台内'}
+                        ? t('pool.dataJsonl')
+                        : t('pool.dataInline')}
                   </dd>
                 </div>
               </dl>
@@ -410,10 +428,10 @@ export function PoolDetailPage() {
             <div className="owner-secret-head">
               <LockKeyhole aria-hidden="true" />
               <div>
-                <strong>任务说明</strong>
+                <strong>{t('pool.taskNotes')}</strong>
               </div>
             </div>
-            <p>做任务的人在自己电脑上看题目。这个页面默认只给你看进度。</p>
+            <p>{t('pool.notesLead')}</p>
             {capsule ? (
               <>
                 <div className="capsule-detail-summary">
@@ -423,27 +441,27 @@ export function PoolDetailPage() {
                   <dl>
                     {capsule.inputDescription && capsule.inputDescription !== pool.publicSummary ? (
                       <div>
-                        <dt>输入</dt>
+                        <dt>{t('pool.input')}</dt>
                         <dd>{capsule.inputDescription}</dd>
                       </div>
                     ) : null}
                     <div>
-                      <dt>输出</dt>
+                      <dt>{t('pool.output')}</dt>
                       <dd>{capsule.outputDescription}</dd>
                     </div>
                     <div>
-                      <dt>格式</dt>
+                      <dt>{t('pool.format')}</dt>
                       <dd>{capsule.delivery.format.toUpperCase()}</dd>
                     </div>
                     <div>
-                      <dt>最大输出</dt>
+                      <dt>{t('pool.maxOutput')}</dt>
                       <dd>{Math.round(capsule.delivery.maxBytes / 1024)} KB</dd>
                     </div>
                   </dl>
                 </div>
                 <details>
                   <summary>
-                    约束与示例 <ChevronDown aria-hidden="true" />
+                    {t('pool.constraintsExamples')} <ChevronDown aria-hidden="true" />
                   </summary>
                   <pre>
                     {JSON.stringify(
@@ -455,7 +473,7 @@ export function PoolDetailPage() {
                 </details>
                 <details>
                   <summary>
-                    实际验收 checks <ChevronDown aria-hidden="true" />
+                    {t('pool.actualChecks')} <ChevronDown aria-hidden="true" />
                   </summary>
                   <pre>{JSON.stringify(capsule.acceptance, null, 2)}</pre>
                 </details>
@@ -463,9 +481,9 @@ export function PoolDetailPage() {
             ) : (
               <details>
                 <summary>
-                  查看 legacy 任务指令 <ChevronDown aria-hidden="true" />
+                  {t('pool.legacyInstructions')} <ChevronDown aria-hidden="true" />
                 </summary>
-                <pre>{pool.secretInstruction || '服务端未返回任务指令。'}</pre>
+                <pre>{pool.secretInstruction || t('pool.noInstruction')}</pre>
               </details>
             )}
           </aside>
@@ -474,10 +492,10 @@ export function PoolDetailPage() {
         <section className="results-section">
           <div className="result-toolbar">
             <div>
-              <h2>任务结果与验收</h2>
+              <h2>{t('pool.resultsTitle')}</h2>
             </div>
             <label>
-              <span className="sr-only">按状态筛选</span>
+              <span className="sr-only">{t('pool.filterAria')}</span>
               <select
                 value={statusFilter}
                 onChange={(event) => {
@@ -486,62 +504,63 @@ export function PoolDetailPage() {
                   void loadResultPage(0, value);
                 }}
               >
-                <option value="all">全部状态</option>
-                <option value="submitted">待验收</option>
-                <option value="accepted">已通过</option>
-                <option value="failed">失败</option>
+                <option value="all">{t('pool.filterAll')}</option>
+                <option value="submitted">{t('pool.filterSubmitted')}</option>
+                <option value="accepted">{t('pool.filterAccepted')}</option>
+                <option value="failed">{t('pool.filterFailed')}</option>
               </select>
             </label>
           </div>
-          <div className="results-table" role="table" aria-label="任务交付结果">
+          <div className="results-table" role="table" aria-label={t('pool.tableAria')}>
             <div className="results-head" role="row">
-              <span>任务</span>
-              <span>状态</span>
-              <span>{webhookDelivery ? '输入 / 确认' : '输入 / 结果'}</span>
-              <span>执行</span>
-              <span>验收</span>
+              <span>{t('pool.colUnit')}</span>
+              <span>{t('pool.colStatus')}</span>
+              <span>{webhookDelivery ? t('pool.colIoConfirm') : t('pool.colIoResult')}</span>
+              <span>{t('pool.colRun')}</span>
+              <span>{t('pool.colReview')}</span>
             </div>
             {filteredUnits.map((unit, index) => (
               <article className="result-row" role="row" key={unit.id}>
                 <div className="result-id">
                   <span>{String(resultOffset + index + 1).padStart(4, '0')}</span>
                   <strong>{unit.label || unit.id.slice(0, 8)}</strong>
-                  {unit.isPilot ? <em className="pilot-unit-tag">试跑</em> : null}
+                  {unit.isPilot ? <em className="pilot-unit-tag">{t('pool.pilotTag')}</em> : null}
                   <small>{relativeTime(unit.updatedAt)}</small>
                 </div>
                 <div>
                   <span className={`unit-status unit-${unit.status}`}>
-                    {UNIT_STATUS[unit.status]}
+                    {unitStatus[unit.status]}
                   </span>
                   {unit.score !== undefined ? <small>Score {percent(unit.score)}</small> : null}
                 </div>
                 <details className="result-detail">
                   <summary>
-                    {webhookDelivery ? '查看输入和确认' : '查看输入和结果'}{' '}
+                    {webhookDelivery ? t('pool.viewIoConfirm') : t('pool.viewIoResult')}{' '}
                     <ChevronDown aria-hidden="true" />
                   </summary>
                   <div>
-                    <span>输入</span>
-                    <pre>{resultJson(unit.input)}</pre>
+                    <span>{t('pool.input')}</span>
+                    <pre>{resultJson(unit.input, t('pool.noDelivery'))}</pre>
                   </div>
                   {webhookDelivery ? (
                     <div>
-                      <span>对方的确认</span>
-                      <pre>{resultJson(unit.externalReceipt)}</pre>
+                      <span>{t('pool.theirConfirm')}</span>
+                      <pre>{resultJson(unit.externalReceipt, t('pool.noDelivery'))}</pre>
                     </div>
                   ) : (
                     <div>
-                      <span>结果</span>
-                      <pre>{resultJson(unit.output)}</pre>
+                      <span>{t('pool.result')}</span>
+                      <pre>{resultJson(unit.output, t('pool.noDelivery'))}</pre>
                     </div>
                   )}
                   <div className="validation-evidence">
-                    <span>检查记录 · 第 {unit.attemptCount ?? 0} 次</span>
+                    <span>{t('pool.checkRecord', { attempt: unit.attemptCount ?? 0 })}</span>
                     <pre>
                       {resultJson(
                         unit.validation || {
-                          checks: '服务端未返回 validation evidence',
+                          checks: t('pool.noValidation'),
                         },
+                        t('pool.noDelivery'),
                       )}
                     </pre>
                   </div>
@@ -560,7 +579,7 @@ export function PoolDetailPage() {
                         className="icon-button icon-accept"
                         type="button"
                         disabled={reviewing === unit.id}
-                        aria-label={`通过 ${unit.label || unit.id}`}
+                        aria-label={t('pool.acceptAria', { label: unit.label || unit.id })}
                         onClick={() => void review(unit, 'accept')}
                       >
                         <Check aria-hidden="true" />
@@ -570,7 +589,7 @@ export function PoolDetailPage() {
                           className="icon-button icon-retry"
                           type="button"
                           disabled={reviewing === unit.id}
-                          aria-label={`重新执行 ${unit.label || unit.id}`}
+                          aria-label={t('pool.retryAria', { label: unit.label || unit.id })}
                           onClick={() => void review(unit, 'retry')}
                         >
                           <RotateCcw aria-hidden="true" />
@@ -580,7 +599,7 @@ export function PoolDetailPage() {
                         className="icon-button icon-reject"
                         type="button"
                         disabled={reviewing === unit.id}
-                        aria-label={`拒绝 ${unit.label || unit.id}`}
+                        aria-label={t('pool.rejectAria', { label: unit.label || unit.id })}
                         onClick={() => void review(unit, 'reject')}
                       >
                         <X aria-hidden="true" />
@@ -593,15 +612,17 @@ export function PoolDetailPage() {
               </article>
             ))}
             {!filteredUnits.length ? (
-              <div className="results-empty">当前筛选条件下还没有任务。</div>
+              <div className="results-empty">{t('pool.emptyFilter')}</div>
             ) : null}
           </div>
           {(pool.resultTotal || 0) > 100 ? (
             <div className="result-pagination">
               <span>
-                显示 {resultOffset + 1}–
-                {Math.min(resultOffset + filteredUnits.length, pool.resultTotal || 0)} /{' '}
-                {(pool.resultTotal || 0).toLocaleString('zh-CN')}
+                {t('pool.showing', {
+                  from: resultOffset + 1,
+                  to: Math.min(resultOffset + filteredUnits.length, pool.resultTotal || 0),
+                  total: formatInteger(pool.resultTotal || 0),
+                })}
               </span>
               <div>
                 <button
@@ -610,7 +631,7 @@ export function PoolDetailPage() {
                   disabled={resultLoading || resultOffset === 0}
                   onClick={() => void loadResultPage(Math.max(0, resultOffset - 100))}
                 >
-                  上一页
+                  {t('pool.prev')}
                 </button>
                 <button
                   className="button button-outline button-small"
@@ -620,7 +641,7 @@ export function PoolDetailPage() {
                   }
                   onClick={() => void loadResultPage(resultOffset + 100)}
                 >
-                  下一页
+                  {t('pool.next')}
                 </button>
               </div>
             </div>
@@ -643,15 +664,15 @@ export function PoolDetailPage() {
             <div className="dialog-icon">
               <Ban aria-hidden="true" />
             </div>
-            <h2 id="cancel-title">取消这批任务？</h2>
-            <p>还没开始的会停掉并退回积分。已经在做的会按结果结算。取消后不能恢复。</p>
+            <h2 id="cancel-title">{t('pool.cancelTitle')}</h2>
+            <p>{t('pool.cancelBody')}</p>
             <div className="dialog-actions">
               <button
                 className="button button-quiet"
                 type="button"
                 onClick={() => setCancelOpen(false)}
               >
-                暂不取消
+                {t('pool.keep')}
               </button>
               <button
                 className="button button-danger"
@@ -659,7 +680,7 @@ export function PoolDetailPage() {
                 disabled={cancelling}
                 onClick={() => void cancel()}
               >
-                {cancelling ? '正在取消…' : '确认取消'}
+                {cancelling ? t('pool.cancelling') : t('pool.confirmCancel')}
               </button>
             </div>
           </section>

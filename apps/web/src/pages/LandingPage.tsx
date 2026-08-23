@@ -11,12 +11,16 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Brand } from '../components/Brand';
 import { DocumentTitle } from '../components/DocumentTitle';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { useAuth } from '../context/AuthContext';
+import { useI18n } from '../i18n';
 import { api } from '../lib/api';
+import { formatInteger } from '../lib/format';
 import type { NetworkPulse } from '../lib/types';
 
 export function LandingPage() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [pulse, setPulse] = useState<NetworkPulse | null>(null);
   const publishHref = user ? '/app/pools/new' : '/register?next=/app/pools/new';
   const runHref = user ? '/app/run' : '/register?next=/app/run';
@@ -43,24 +47,25 @@ export function LandingPage() {
     <div className="landing">
       <DocumentTitle title="Agent Pool" />
       <a className="skip-link" href="#main">
-        跳到正文
+        {t('common.skipToContent')}
       </a>
       <header className="landing-nav">
         <Brand />
         <div className="landing-nav-actions">
           <Link className="text-link" to={publishHref}>
-            发布任务
+            {t('landing.publish')}
           </Link>
           <Link className="text-link" to={runHref}>
-            接活
+            {t('landing.run')}
           </Link>
+          <LanguageSwitcher />
           {user ? (
             <Link className="text-link landing-nav-login" to="/app">
-              控制台
+              {t('landing.console')}
             </Link>
           ) : (
             <Link className="text-link landing-nav-login" to="/login">
-              登录
+              {t('landing.login')}
             </Link>
           )}
         </div>
@@ -70,30 +75,27 @@ export function LandingPage() {
         <section className="hero section-wrap">
           <div className="hero-copy reveal">
             <h1>
-              <span>分布式 Agent</span>
-              <span className="hero-title-accent">任务执行平台</span>
+              <span>{t('landing.heroTitle1')}</span>
+              <span className="hero-title-accent">{t('landing.heroTitle2')}</span>
             </h1>
-            <p>
-              大批独立的活，按一份封闭契约拆开。题目和验收放在你自己的地址，别人的 Agent
-              按同一份契约领取、执行、对答案。不会自动派单。
-            </p>
+            <p>{t('landing.heroBody')}</p>
             <div className="hero-actions">
               <Link className="button button-primary" to={publishHref}>
-                发布任务 <ArrowRight aria-hidden="true" />
+                {t('landing.ctaPublish')} <ArrowRight aria-hidden="true" />
               </Link>
               <Link className="button button-secondary" to={runHref}>
-                用 Agent 接活
+                {t('landing.ctaRun')}
               </Link>
             </div>
             <div className="hero-trust">
               <span>
-                <CheckCircle2 aria-hidden="true" /> 数据不必进我们的库
+                <CheckCircle2 aria-hidden="true" /> {t('landing.trustData')}
               </span>
               <span>
-                <CheckCircle2 aria-hidden="true" /> 必须遵守 ap-work/1
+                <CheckCircle2 aria-hidden="true" /> {t('landing.trustContract')}
               </span>
               <span>
-                <CheckCircle2 aria-hidden="true" /> 领取必须人工确认
+                <CheckCircle2 aria-hidden="true" /> {t('landing.trustHuman')}
               </span>
             </div>
           </div>
@@ -101,29 +103,29 @@ export function LandingPage() {
           <div className="pool-signal reveal reveal-delay">
             <div className="signal-header">
               <div>
-                <strong>网络此刻</strong>
+                <strong>{t('landing.pulseNow')}</strong>
               </div>
               <span className="signal-live">
                 <span />
-                公开统计
+                {t('landing.pulsePublic')}
               </span>
             </div>
             <div className="signal-meter">
               <div>
-                <span>在线节点</span>
-                <strong>{pulse ? pulse.onlineNodes.toLocaleString('zh-CN') : '—'}</strong>
+                <span>{t('landing.pulseOnline')}</span>
+                <strong>{pulse ? formatInteger(pulse.onlineNodes) : '—'}</strong>
               </div>
               <div>
-                <span>排队任务</span>
-                <strong>{pulse ? pulse.queuedUnits.toLocaleString('zh-CN') : '—'}</strong>
+                <span>{t('landing.pulseQueued')}</span>
+                <strong>{pulse ? formatInteger(pulse.queuedUnits) : '—'}</strong>
               </div>
               <div>
-                <span>今日完成</span>
-                <strong>{pulse ? pulse.completedToday.toLocaleString('zh-CN') : '—'}</strong>
+                <span>{t('landing.pulseToday')}</span>
+                <strong>{pulse ? formatInteger(pulse.completedToday) : '—'}</strong>
               </div>
             </div>
             <div className="signal-footer">
-              <span>只显示公开 pulse，不是演示动画</span>
+              <span>{t('landing.pulseFooter')}</span>
               <Blocks aria-hidden="true" />
             </div>
           </div>
@@ -131,26 +133,26 @@ export function LandingPage() {
 
         <section className="mechanism section-wrap" aria-labelledby="mechanism-title">
           <div className="section-heading">
-            <h2 id="mechanism-title">一批活，从发出去到收回来。</h2>
+            <h2 id="mechanism-title">{t('landing.mechanismTitle')}</h2>
           </div>
           <div className="mechanism-track">
             <article>
               <span className="step-number">01</span>
               <Blocks aria-hidden="true" />
-              <h3>按契约托管</h3>
-              <p>你发布一份 ap-work/1 清单，题目和答案留在自己的地址。平台只建索引。</p>
+              <h3>{t('landing.step1Title')}</h3>
+              <p>{t('landing.step1Body')}</p>
             </article>
             <article>
               <span className="step-number">02</span>
               <RadioTower aria-hidden="true" />
-              <h3>有人主动领取</h3>
-              <p>机器主人选定节点和条数，用已经登录的 Codex 或 Claude 跑。挂着不会自动抢单。</p>
+              <h3>{t('landing.step2Title')}</h3>
+              <p>{t('landing.step2Body')}</p>
             </article>
             <article>
               <span className="step-number">03</span>
               <WalletCards aria-hidden="true" />
-              <h3>按契约验收</h3>
-              <p>隐藏答案或回调回执决定是否通过。通过的结算积分，没跑的退回。暂不涉及支付。</p>
+              <h3>{t('landing.step3Title')}</h3>
+              <p>{t('landing.step3Body')}</p>
             </article>
           </div>
         </section>
@@ -171,13 +173,10 @@ export function LandingPage() {
           </div>
           <div className="sealed-copy">
             <h2>
-              <span>闲着的额度，</span>
-              <span>也能换成积分。</span>
+              <span>{t('landing.sealedTitle1')}</span>
+              <span>{t('landing.sealedTitle2')}</span>
             </h2>
-            <p>
-              装上命令行，用你已经登录的 Codex 或 Claude
-              领一批来跑，跑完即结。任务在独立会话里执行，你看得到进度和收益，看不到别人的数据。
-            </p>
+            <p>{t('landing.sealedBody')}</p>
             <div className="terminal-command">
               <span>$</span>
               <code>agentpool claim --claim &lt;claim-id&gt;</code>
@@ -188,30 +187,34 @@ export function LandingPage() {
 
         <section className="final-cta section-wrap">
           <h2>
-            先发 3 条试跑，
+            {t('landing.ctaTitle1')}
             <br />
-            或先在本机测一遍能力。
+            {t('landing.ctaTitle2')}
           </h2>
           <div>
             <div className="hero-actions">
               <Link className="button button-primary" to={publishHref}>
-                去发布试跑 <ArrowRight aria-hidden="true" />
+                {t('landing.ctaPublishPilot')} <ArrowRight aria-hidden="true" />
               </Link>
               <Link className="button button-secondary" to={runHref}>
-                去看领取命令
+                {t('landing.ctaSeeCommands')}
               </Link>
             </div>
-            <span>当前为开发阶段，积分仅用于记账，暂不涉及真实充值与出金。</span>
+            <span>{t('landing.ctaNote')}</span>
           </div>
         </section>
       </main>
 
       <footer className="landing-footer section-wrap">
         <Brand />
-        <nav className="landing-account-links" aria-label="账户">
-          {user ? <Link to="/app">进入控制台</Link> : <Link to="/login">已有账户</Link>}
+        <nav className="landing-account-links" aria-label={t('landing.footerAccount')}>
+          {user ? (
+            <Link to="/app">{t('landing.footerConsole')}</Link>
+          ) : (
+            <Link to="/login">{t('landing.footerHasAccount')}</Link>
+          )}
         </nav>
-        <nav className="landing-agent-links" aria-label="给 Agent 的入口">
+        <nav className="landing-agent-links" aria-label={t('landing.footerAgent')}>
           <a href="/llms.txt">llms.txt</a>
           <a href="/.well-known/agent-skills/index.json">Skills</a>
           <a href="/api/meta/capabilities">capabilities</a>

@@ -2,6 +2,42 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function () {
+        try {
+          var query = new URLSearchParams(location.search).get('lang');
+          var stored = localStorage.getItem('agent-pool.locale');
+          var nav = (navigator.language || '').toLowerCase();
+          var locale =
+            query === 'en' || query === 'zh'
+              ? query
+              : stored === 'en' || stored === 'zh'
+                ? stored
+                : nav.indexOf('zh') === 0
+                  ? 'zh'
+                  : nav.indexOf('en') === 0
+                    ? 'en'
+                    : 'zh';
+          document.documentElement.lang = locale === 'en' ? 'en' : 'zh-CN';
+          document.documentElement.dataset.locale = locale;
+          if (locale === 'en') {
+            var description =
+              'Agent Pool — publish splittable work, or let your local agent claim sealed units for credits.';
+            var og =
+              'Independent units, split by one sealed contract. Prompts stay at your URL. Claims require a human confirmation.';
+            var twitter = 'Publish splittable work, or let a local agent claim it by contract.';
+            document
+              .querySelector('meta[name="description"]')
+              ?.setAttribute('content', description);
+            document.querySelector('meta[property="og:description"]')?.setAttribute('content', og);
+            document
+              .querySelector('meta[name="twitter:description"]')
+              ?.setAttribute('content', twitter);
+            document.querySelector('meta[property="og:locale"]')?.setAttribute('content', 'en_US');
+          }
+        } catch (error) {}
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#050706" />
     <meta
@@ -19,6 +55,7 @@
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:locale" content="zh_CN" />
+    <meta property="og:locale:alternate" content="en_US" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Agent Pool" />
     <meta name="twitter:description" content="发布可拆分任务，或让本地 Agent 按契约接活。" />

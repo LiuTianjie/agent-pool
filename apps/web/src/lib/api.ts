@@ -5,6 +5,8 @@ import type {
   TaskCapsule,
   WalletSummary,
 } from '@agent-pool/shared';
+import { getLocale, intlLocale } from '../i18n/locale';
+import { t } from '../i18n/translate';
 import type { CreatePoolWebInput, DeliveryTarget } from './taskContract';
 import type {
   CapacityCatalogItem,
@@ -44,6 +46,7 @@ export class ApiError extends Error {
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
+  headers.set('Accept-Language', intlLocale(getLocale()));
   if (init.body && !(init.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
@@ -69,7 +72,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
         errorBody?.message ||
         flatError ||
         (typeof body === 'string' && body) ||
-        '请求失败',
+        t('errors.requestFailed'),
       response.status,
       nestedError?.details || errorBody?.details,
       nestedError?.code,
@@ -278,16 +281,17 @@ function ledgerKind(kind: string): LedgerEntry['kind'] {
 }
 
 function ledgerDescription(row: RawLedgerEntry): string {
-  const labels: Record<string, string> = {
-    dev_topup: '增加开发态可消费积分',
-    pool_lock: '任务预算流动',
-    unit_settlement: '任务验收结算',
-    earning_release: '收益释放为可转出积分',
-    dev_withdrawal: '开发态模拟转出',
-    pool_refund: '未执行任务预算退回',
-    self_settlement: '自己跑完，积分已消耗、不计入收益',
+  const labels: Record<string, Parameters<typeof t>[0]> = {
+    dev_topup: 'wallet.noteTopup',
+    pool_lock: 'wallet.noteLock',
+    unit_settlement: 'wallet.noteSettlement',
+    earning_release: 'wallet.noteRelease',
+    dev_withdrawal: 'wallet.noteWithdraw',
+    pool_refund: 'wallet.noteRefund',
+    self_settlement: 'wallet.noteSelf',
   };
-  return labels[row.kind] || row.kind.replaceAll('_', ' ');
+  const key = labels[row.kind];
+  return key ? t(key) : row.kind.replaceAll('_', ' ');
 }
 
 function unitFromResult(row: ResultRow, fallbackAt: string): PoolUnit {

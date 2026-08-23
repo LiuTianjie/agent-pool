@@ -1,4 +1,5 @@
 import { Radio } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 function withEllipsis(label: string) {
   if (label.endsWith('…')) return label;
@@ -6,11 +7,12 @@ function withEllipsis(label: string) {
   return `${label}…`;
 }
 
-export function LoadingState({ label = '正在加载…' }: { label?: string }) {
+export function LoadingState({ label }: { label?: string }) {
+  const { t } = useI18n();
   return (
     <div className="loading-state" role="status">
       <Radio aria-hidden="true" />
-      <span>{withEllipsis(label)}</span>
+      <span>{withEllipsis(label ?? t('common.loading'))}</span>
     </div>
   );
 }
@@ -24,15 +26,16 @@ export function InlineError({
   title?: string;
   retry?: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="inline-error" role="alert">
       <div>
-        <strong>{title ?? (retry ? '无法读取' : '没法继续')}</strong>
+        <strong>{title ?? (retry ? t('common.cannotRead') : t('common.cannotContinue'))}</strong>
         <p>{message}</p>
       </div>
       {retry ? (
         <button className="button button-quiet" type="button" onClick={retry}>
-          重试
+          {t('common.retry')}
         </button>
       ) : null}
     </div>

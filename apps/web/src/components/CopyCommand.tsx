@@ -1,7 +1,9 @@
 import { Check, Copy } from 'lucide-react';
 import { useState } from 'react';
+import { useI18n } from '../i18n';
 
 export function CopyCommand({ command, label }: { command: string; label?: string }) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -21,7 +23,7 @@ export function CopyCommand({ command, label }: { command: string; label?: strin
         <button
           className="icon-button"
           type="button"
-          aria-label="复制命令"
+          aria-label={t('common.copyCommand')}
           onClick={() => void copy()}
         >
           {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}

@@ -7,6 +7,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { t } from '../i18n/translate';
 import { api, ApiError } from '../lib/api';
 import type { User } from '../lib/types';
 
@@ -25,7 +26,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
-  return '暂时无法连接 Agent Pool';
+  return t('errors.connect');
 }
 
 export function AuthProvider({ children }: PropsWithChildren) {

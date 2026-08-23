@@ -16,20 +16,11 @@ import { DocumentTitle } from '../components/DocumentTitle';
 import { InlineError } from '../components/LoadingState';
 import { PageHeader } from '../components/PageHeader';
 import { useAuth } from '../context/AuthContext';
+import { useI18n } from '../i18n';
 import { controlScopePresentation, highRiskControlScopes } from '../lib/controlAuthorization';
 import { api, ApiError } from '../lib/api';
+import { credentialDate } from '../lib/format';
 import type { ControlCredential } from '../lib/types';
-
-function formatCredentialDate(value: string | null): string {
-  if (!value) return '尚未使用';
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value));
-}
 
 function credentialState(credential: ControlCredential): 'active' | 'expired' | 'revoked' {
   if (credential.revokedAt) return 'revoked';
@@ -38,6 +29,7 @@ function credentialState(credential: ControlCredential): 'active' | 'expired' | 
 
 export function SettingsPage() {
   const { user, setUser, logout } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [saving, setSaving] = useState(false);
@@ -58,12 +50,12 @@ export function SettingsPage() {
       setCredentials(await api.controlCredentials());
     } catch (requestError) {
       setCredentialError(
-        requestError instanceof ApiError ? requestError.message : '无法读取控制 Agent 凭证',
+        requestError instanceof ApiError ? requestError.message : t('settings.loadError'),
       );
     } finally {
       setCredentialsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadCredentials();
@@ -91,7 +83,7 @@ export function SettingsPage() {
       setUser(result.user);
       setSaved(true);
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : '保存失败');
+      setError(requestError instanceof ApiError ? requestError.message : t('settings.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -112,7 +104,7 @@ export function SettingsPage() {
       setPendingRevokeId(null);
     } catch (requestError) {
       setCredentialError(
-        requestError instanceof ApiError ? requestError.message : '撤销控制凭证失败',
+        requestError instanceof ApiError ? requestError.message : t('settings.revokeError'),
       );
     } finally {
       setRevokingId(null);
@@ -126,11 +118,11 @@ export function SettingsPage() {
 
   return (
     <div className="page settings-page">
-      <DocumentTitle title="设置" />
+      <DocumentTitle title={t('settings.title')} />
       <PageHeader
-        eyebrow="设置"
-        title="账户设置"
-        description="改名字，或管理谁能代你操作。模型密钥还在你自己的电脑上。"
+        eyebrow={t('settings.title')}
+        title={t('settings.heading')}
+        description={t('settings.description')}
       />
       {error ? <InlineError message={error} /> : null}
 
@@ -141,12 +133,12 @@ export function SettingsPage() {
               <UserRound aria-hidden="true" />
             </span>
             <div>
-              <h2>公开身份</h2>
-              <p>显示在任务发布记录和你自己的控制台中。</p>
+              <h2>{t('settings.publicIdentity')}</h2>
+              <p>{t('settings.publicIdentityLead')}</p>
             </div>
           </div>
           <label className="field">
-            <span>显示名称</span>
+            <span>{t('settings.displayName')}</span>
             <input
               value={displayName}
               minLength={2}
@@ -156,20 +148,20 @@ export function SettingsPage() {
             />
           </label>
           <label className="field">
-            <span>登录邮箱</span>
+            <span>{t('settings.email')}</span>
             <input value={user?.email || ''} disabled />
-            <small>当前版本暂不支持修改邮箱。</small>
+            <small>{t('settings.emailLocked')}</small>
           </label>
           <div className="settings-actions">
             <span className={saved ? 'save-confirm save-confirm-visible' : 'save-confirm'}>
-              已保存
+              {t('settings.saved')}
             </span>
             <button
               className="button button-primary"
               type="submit"
               disabled={saving || displayName.trim() === user?.displayName}
             >
-              <Save aria-hidden="true" /> {saving ? '保存中…' : '保存修改'}
+              <Save aria-hidden="true" /> {saving ? t('settings.saving') : t('settings.save')}
             </button>
           </div>
         </form>
@@ -180,28 +172,28 @@ export function SettingsPage() {
               <ShieldCheck aria-hidden="true" />
             </span>
             <div>
-              <h2>这个账户管什么</h2>
-              <p>管任务和授权，不管模型登录。</p>
+              <h2>{t('settings.boundaryTitle')}</h2>
+              <p>{t('settings.boundaryLead')}</p>
             </div>
           </div>
           <div className="credential-boundary">
             <div>
               <KeyRound aria-hidden="true" />
               <span>
-                <strong>Agent Pool</strong>
-                <small>网站、领取工具和授权分开</small>
+                <strong>{t('settings.poolName')}</strong>
+                <small>{t('settings.poolDetail')}</small>
               </span>
             </div>
             <i aria-hidden="true" />
             <div>
               <KeyRound aria-hidden="true" />
               <span>
-                <strong>Codex / Claude</strong>
-                <small>只留在你自己的电脑</small>
+                <strong>{t('settings.modelName')}</strong>
+                <small>{t('settings.modelDetail')}</small>
               </span>
             </div>
           </div>
-          <p className="settings-note">代你操作的工具只能做你批准过的事，拿不到模型密钥。</p>
+          <p className="settings-note">{t('settings.boundaryNote')}</p>
         </section>
 
         <section className="settings-card control-credentials-card">
@@ -210,12 +202,14 @@ export function SettingsPage() {
               <Bot aria-hidden="true" />
             </span>
             <div>
-              <h2>控制 Agent</h2>
-              <p>可以让别的程序代你操作。每个授权都能单独关掉。</p>
+              <h2>{t('settings.controlTitle')}</h2>
+              <p>{t('settings.controlLead')}</p>
             </div>
             <span className="credential-count">
-              {credentials.filter((credential) => credentialState(credential) === 'active').length}{' '}
-              生效中
+              {t('settings.activeCount', {
+                count: credentials.filter((credential) => credentialState(credential) === 'active')
+                  .length,
+              })}
             </span>
           </div>
 
@@ -225,15 +219,15 @@ export function SettingsPage() {
 
           {credentialsLoading ? (
             <div className="credential-list-loading" role="status">
-              <span aria-hidden="true" /> 正在读取控制凭证…
+              <span aria-hidden="true" /> {t('settings.loading')}
             </div>
           ) : credentialError &&
             orderedCredentials.length === 0 ? null : orderedCredentials.length === 0 ? (
             <div className="control-credentials-empty">
               <Bot aria-hidden="true" />
               <span>
-                <strong>还没有控制 Agent</strong>
-                <small>在终端登录控制后，回到这里确认它能做什么。</small>
+                <strong>{t('settings.emptyTitle')}</strong>
+                <small>{t('settings.emptyDetail')}</small>
               </span>
             </div>
           ) : (
@@ -255,13 +249,24 @@ export function SettingsPage() {
                       <header>
                         <span>
                           <strong>{credential.label}</strong>
-                          <small>授权于 {formatCredentialDate(credential.createdAt)}</small>
+                          <small>
+                            {t('settings.grantedAt', {
+                              date: credentialDate(credential.createdAt),
+                            })}
+                          </small>
                         </span>
                         <em>
-                          {state === 'active' ? '可用' : state === 'expired' ? '已过期' : '已撤销'}
+                          {state === 'active'
+                            ? t('settings.stateActive')
+                            : state === 'expired'
+                              ? t('settings.stateExpired')
+                              : t('settings.stateRevoked')}
                         </em>
                       </header>
-                      <div className="control-credential-scopes" aria-label="已授权能力">
+                      <div
+                        className="control-credential-scopes"
+                        aria-label={t('settings.scopesAria')}
+                      >
                         {credential.scopes.map((scope) => {
                           const presentation = controlScopePresentation(scope);
                           return (
@@ -278,20 +283,20 @@ export function SettingsPage() {
                       <dl>
                         <div>
                           <dt>
-                            <Clock3 aria-hidden="true" /> 有效期至
+                            <Clock3 aria-hidden="true" /> {t('settings.expires')}
                           </dt>
-                          <dd>{formatCredentialDate(credential.expiresAt)}</dd>
+                          <dd>{credentialDate(credential.expiresAt)}</dd>
                         </div>
                         <div>
                           <dt>
-                            <CheckCircle2 aria-hidden="true" /> 最近使用
+                            <CheckCircle2 aria-hidden="true" /> {t('settings.lastUsed')}
                           </dt>
-                          <dd>{formatCredentialDate(credential.lastUsedAt)}</dd>
+                          <dd>{credentialDate(credential.lastUsedAt)}</dd>
                         </div>
                         {highRiskCount > 0 ? (
                           <div className="is-high-risk">
-                            <dt>高风险能力</dt>
-                            <dd>{highRiskCount} 项</dd>
+                            <dt>{t('settings.highRisk')}</dt>
+                            <dd>{t('settings.highRiskCount', { count: highRiskCount })}</dd>
                           </div>
                         ) : null}
                       </dl>
@@ -301,16 +306,16 @@ export function SettingsPage() {
                         <div
                           className="credential-revoke-confirm"
                           role="group"
-                          aria-label="确认撤销"
+                          aria-label={t('settings.confirmAria')}
                         >
-                          <span>撤销后立即失效</span>
+                          <span>{t('settings.revokeImmediate')}</span>
                           <button
                             className="button button-quiet button-small"
                             type="button"
                             disabled={revokingId === credential.id}
                             onClick={() => setPendingRevokeId(null)}
                           >
-                            <X aria-hidden="true" /> 保留
+                            <X aria-hidden="true" /> {t('settings.keep')}
                           </button>
                           <button
                             className="button button-danger-quiet button-small"
@@ -319,7 +324,9 @@ export function SettingsPage() {
                             onClick={() => void revokeCredential(credential.id)}
                           >
                             <Trash2 aria-hidden="true" />
-                            {revokingId === credential.id ? '撤销中…' : '确认撤销'}
+                            {revokingId === credential.id
+                              ? t('settings.revoking')
+                              : t('settings.confirmRevoke')}
                           </button>
                         </div>
                       ) : (
@@ -328,7 +335,7 @@ export function SettingsPage() {
                           type="button"
                           onClick={() => setPendingRevokeId(credential.id)}
                         >
-                          <Trash2 aria-hidden="true" /> 撤销
+                          <Trash2 aria-hidden="true" /> {t('settings.revoke')}
                         </button>
                       )}
                     </div>
@@ -337,9 +344,7 @@ export function SettingsPage() {
               })}
             </div>
           )}
-          <p className="settings-note control-credentials-note">
-            关掉某个授权，不会让已经在做的任务停掉。
-          </p>
+          <p className="settings-note control-credentials-note">{t('settings.controlNote')}</p>
         </section>
 
         <section className="settings-card danger-card">
@@ -348,8 +353,8 @@ export function SettingsPage() {
               <LogOut aria-hidden="true" />
             </span>
             <div>
-              <h2>退出登录</h2>
-              <p>只退出这个浏览器。已经连上的机器还在。</p>
+              <h2>{t('settings.signOutTitle')}</h2>
+              <p>{t('settings.signOutLead')}</p>
             </div>
           </div>
           <button
@@ -357,7 +362,7 @@ export function SettingsPage() {
             type="button"
             onClick={() => void signOut()}
           >
-            <LogOut aria-hidden="true" /> 退出登录
+            <LogOut aria-hidden="true" /> {t('settings.signOut')}
           </button>
         </section>
       </div>

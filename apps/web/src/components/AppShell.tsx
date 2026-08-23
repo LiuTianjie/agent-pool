@@ -12,22 +12,25 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useI18n } from '../i18n';
 import { Brand } from './Brand';
-
-const NAV = [
-  { to: '/app', label: '控制台', icon: Gauge, end: true },
-  { to: '/app/pools/new', label: '发布任务', icon: Plus },
-  { to: '/app/run', label: '接活', icon: RadioTower },
-  { to: '/app/wallet', label: '积分', icon: WalletCards },
-  { to: '/app/settings', label: '设置', icon: Settings },
-];
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 export function AppShell() {
   const { user, logout } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  const nav = [
+    { to: '/app', label: t('nav.console'), icon: Gauge, end: true },
+    { to: '/app/pools/new', label: t('nav.publish'), icon: Plus },
+    { to: '/app/run', label: t('nav.run'), icon: RadioTower },
+    { to: '/app/wallet', label: t('nav.wallet'), icon: WalletCards },
+    { to: '/app/settings', label: t('nav.settings'), icon: Settings },
+  ];
 
   const signOut = async () => {
     await logout();
@@ -75,21 +78,24 @@ export function AppShell() {
   return (
     <div className="app-frame">
       <a className="skip-link" href="#app-main">
-        跳到正文
+        {t('common.skipToContent')}
       </a>
       <header className="mobile-header">
         <Brand compact />
-        <button
-          ref={menuButtonRef}
-          className="icon-button"
-          type="button"
-          aria-label={mobileOpen ? '关闭导航' : '打开导航'}
-          aria-expanded={mobileOpen}
-          aria-controls="app-sidebar"
-          onClick={() => setMobileOpen((open) => !open)}
-        >
-          {mobileOpen ? <X /> : <Menu />}
-        </button>
+        <div className="mobile-header-actions">
+          <LanguageSwitcher compact />
+          <button
+            ref={menuButtonRef}
+            className="icon-button"
+            type="button"
+            aria-label={mobileOpen ? t('nav.close') : t('nav.open')}
+            aria-expanded={mobileOpen}
+            aria-controls="app-sidebar"
+            onClick={() => setMobileOpen((open) => !open)}
+          >
+            {mobileOpen ? <X /> : <Menu />}
+          </button>
+        </div>
       </header>
 
       <aside
@@ -99,9 +105,10 @@ export function AppShell() {
       >
         <div className="sidebar-top">
           <Brand compact />
+          <LanguageSwitcher />
         </div>
-        <nav className="app-nav" aria-label="主要导航">
-          {NAV.map(({ to, label, icon: Icon, end }) => (
+        <nav className="app-nav" aria-label={t('nav.primary')}>
+          {nav.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
@@ -120,7 +127,12 @@ export function AppShell() {
             <strong>{user?.displayName}</strong>
             <span>{user?.email}</span>
           </div>
-          <button className="icon-button" type="button" aria-label="退出登录" onClick={signOut}>
+          <button
+            className="icon-button"
+            type="button"
+            aria-label={t('nav.signOut')}
+            onClick={signOut}
+          >
             <LogOut />
           </button>
         </div>
@@ -129,7 +141,7 @@ export function AppShell() {
         <button
           className="sidebar-scrim"
           type="button"
-          aria-label="关闭导航"
+          aria-label={t('nav.close')}
           onClick={() => setMobileOpen(false)}
         />
       ) : null}

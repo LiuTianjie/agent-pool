@@ -1,3 +1,4 @@
+import { t } from '../i18n/translate';
 import type { TaskUnitDraft } from './unitTypes';
 
 export type UnitParseMode = 'lines' | 'jsonl';
@@ -21,16 +22,16 @@ export function parseUnits(raw: string, mode: UnitParseMode): TaskUnitDraft[] {
     try {
       value = JSON.parse(line);
     } catch {
-      throw new Error(`第 ${index + 1} 行不是有效 JSON`);
+      throw new Error(t('units.invalidJsonLine', { line: index + 1 }));
     }
 
     if (value && typeof value === 'object' && !Array.isArray(value) && '$unit' in value) {
       const envelope = (value as { $unit?: unknown }).$unit;
       if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)) {
-        throw new Error(`第 ${index + 1} 行的 $unit 必须是对象`);
+        throw new Error(t('units.unitMustBeObject', { line: index + 1 }));
       }
       if (!('input' in envelope)) {
-        throw new Error(`第 ${index + 1} 行的 $unit 缺少 input`);
+        throw new Error(t('units.unitMissingInput', { line: index + 1 }));
       }
       const item = envelope as {
         id?: unknown;

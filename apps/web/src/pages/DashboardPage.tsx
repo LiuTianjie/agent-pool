@@ -10,27 +10,35 @@ import { LiveStatus } from '../components/Status';
 import { WalletGrid } from '../components/WalletGrid';
 import { useAuth } from '../context/AuthContext';
 import { useLiveEvents } from '../hooks/useLiveEvents';
+import { useI18n } from '../i18n';
 import { api, ApiError } from '../lib/api';
+import { formatInteger } from '../lib/format';
 import type { DashboardData } from '../lib/types';
 
 export function DashboardPage() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const refreshTimer = useRef<number | undefined>(undefined);
 
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) setLoading(true);
-    try {
-      setData(await api.dashboard());
-      setError(null);
-    } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : '无法读取控制台');
-    } finally {
-      if (!quiet) setLoading(false);
-    }
-  }, []);
+  const load = useCallback(
+    async (quiet = false) => {
+      if (!quiet) setLoading(true);
+      try {
+        setData(await api.dashboard());
+        setError(null);
+      } catch (requestError) {
+        setError(
+          requestError instanceof ApiError ? requestError.message : t('dashboard.loadError'),
+        );
+      } finally {
+        if (!quiet) setLoading(false);
+      }
+    },
+    [t],
+  );
 
   useEffect(() => {
     void load();
@@ -49,7 +57,7 @@ export function DashboardPage() {
 
   const { state } = useLiveEvents(onLiveEvent);
 
-  if (loading && !data) return <LoadingState label="正在加载" />;
+  if (loading && !data) return <LoadingState label={t('common.loading')} />;
   if (error && !data) return <InlineError message={error} retry={() => void load()} />;
   if (!data) return null;
 
@@ -59,18 +67,19 @@ export function DashboardPage() {
   const recentPools = data.pools
     .filter((pool) => ['completed', 'cancelled'].includes(pool.status))
     .slice(0, 6);
+  const name = user?.displayName || t('dashboard.hello');
 
   return (
     <div className="page dashboard-page">
-      <DocumentTitle title="控制台" />
+      <DocumentTitle title={t('dashboard.title')} />
       <PageHeader
-        eyebrow="控制台"
+        eyebrow={t('dashboard.title')}
         title={
           activePools.length
-            ? `${user?.displayName || '你好'}，任务正在进行。`
-            : `${user?.displayName || '你好'}，可以从这里发出去。`
+            ? t('dashboard.titleActive', { name })
+            : t('dashboard.titleIdle', { name })
         }
-        description="发布一批托管任务，或用自己的 Agent 先跑通。"
+        description={t('dashboard.description')}
         actions={<LiveStatus state={state} />}
       />
 
@@ -84,23 +93,25 @@ export function DashboardPage() {
             <RadioTower />
           </div>
           <div>
-            <strong>{data.network.onlineNodes.toLocaleString('zh-CN')}</strong>
+            <strong>{formatInteger(data.network.onlineNodes)}</strong>
             <p>
-              个 Runner 节点在线，其中 {data.network.busyNodes.toLocaleString('zh-CN')} 个正在执行。
+              {t('dashboard.pulseNodes', {
+                busy: formatInteger(data.network.busyNodes),
+              })}
             </p>
           </div>
           <dl>
             <div>
-              <dt>进行中的任务</dt>
-              <dd>{data.network.activePools.toLocaleString('zh-CN')}</dd>
+              <dt>{t('dashboard.pulseActive')}</dt>
+              <dd>{formatInteger(data.network.activePools)}</dd>
             </div>
             <div>
-              <dt>等待中的任务</dt>
-              <dd>{data.network.queuedUnits.toLocaleString('zh-CN')}</dd>
+              <dt>{t('dashboard.pulseQueued')}</dt>
+              <dd>{formatInteger(data.network.queuedUnits)}</dd>
             </div>
             <div>
-              <dt>今日完成</dt>
-              <dd>{data.network.completedToday.toLocaleString('zh-CN')}</dd>
+              <dt>{t('dashboard.pulseToday')}</dt>
+              <dd>{formatInteger(data.network.completedToday)}</dd>
             </div>
           </dl>
         </div>
@@ -111,8 +122,8 @@ export function DashboardPage() {
               <Plus aria-hidden="true" />
             </span>
             <div>
-              <strong>发布一批任务</strong>
-              <small>指向你托管的工作包</small>
+              <strong>{t('dashboard.publishTitle')}</strong>
+              <small>{t('dashboard.publishDetail')}</small>
             </div>
             <ArrowRight aria-hidden="true" />
           </Link>
@@ -121,8 +132,8 @@ export function DashboardPage() {
               <RadioTower aria-hidden="true" />
             </span>
             <div>
-              <strong>用 Agent 接活</strong>
-              <small>生成领取单，本机执行</small>
+              <strong>{t('dashboard.runTitle')}</strong>
+              <small>{t('dashboard.runDetail')}</small>
             </div>
             <ArrowRight aria-hidden="true" />
           </Link>
@@ -132,7 +143,7 @@ export function DashboardPage() {
       <section className="page-section">
         <div className="section-bar">
           <div>
-            <h2>进行中的任务</h2>
+            <h2>{t('dashboard.activeTitle')}</h2>
           </div>
           <span />
         </div>
@@ -143,12 +154,9 @@ export function DashboardPage() {
             ))}
           </div>
         ) : recentPools.length ? (
-          <p className="dashboard-quiet">现在没有进行中的。最近完成的在下面。</p>
+          <p className="dashboard-quiet">{t('dashboard.quiet')}</p>
         ) : (
-          <EmptyState
-            title="现在还没有进行中的任务"
-            detail="上面可以直接发布一批，或用自己的 Agent 先跑通。"
-          />
+          <EmptyState title={t('dashboard.emptyTitle')} detail={t('dashboard.emptyDetail')} />
         )}
       </section>
 
@@ -156,9 +164,9 @@ export function DashboardPage() {
         <section className="page-section">
           <div className="section-bar">
             <div>
-              <h2>最近完成</h2>
+              <h2>{t('dashboard.recentTitle')}</h2>
             </div>
-            <span>{recentPools.length} 批</span>
+            <span>{t('dashboard.recentCount', { count: recentPools.length })}</span>
           </div>
           <div className="pool-list">
             {recentPools.map((pool) => (
@@ -170,7 +178,7 @@ export function DashboardPage() {
 
       <aside className="privacy-strip">
         <Sparkles aria-hidden="true" />
-        <span>进度里看不到题目和答案。托管正文也不进平台库。</span>
+        <span>{t('dashboard.privacy')}</span>
       </aside>
     </div>
   );

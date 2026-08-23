@@ -1,29 +1,32 @@
 import type { PoolSummary } from '@agent-pool/shared';
+import { useI18n } from '../i18n';
 import type { StreamState } from '../hooks/useLiveEvents';
 
 export type PoolLifecycleStatus = PoolSummary['status'] | 'piloting';
 
-const POOL_LABELS: Record<PoolLifecycleStatus, string> = {
-  draft: '草稿',
-  waiting_capacity: '开放领取',
-  queued: '开放领取',
-  piloting: '试跑开放领取',
-  running: '运行中',
-  paused: '已暂停',
-  completed: '已完成',
-  cancelled: '已取消',
-};
-
 export function PoolStatus({ status }: { status: PoolLifecycleStatus }) {
-  return <span className={`status status-${status}`}>{POOL_LABELS[status]}</span>;
+  const { t } = useI18n();
+  const labels: Record<PoolLifecycleStatus, string> = {
+    draft: t('status.draft'),
+    waiting_capacity: t('status.waitingCapacity'),
+    queued: t('status.queued'),
+    piloting: t('status.piloting'),
+    running: t('status.running'),
+    paused: t('status.paused'),
+    completed: t('status.completed'),
+    cancelled: t('status.cancelled'),
+  };
+
+  return <span className={`status status-${status}`}>{labels[status]}</span>;
 }
 
 export function LiveStatus({ state }: { state: StreamState }) {
+  const { t } = useI18n();
   const label: Record<StreamState, string> = {
-    connecting: '建立实时连接',
-    live: '实时',
-    retrying: '正在重连',
-    stopped: '已停止',
+    connecting: t('status.connecting'),
+    live: t('status.live'),
+    retrying: t('status.retrying'),
+    stopped: t('status.stopped'),
   };
 
   return (

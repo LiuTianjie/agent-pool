@@ -3,8 +3,6 @@ import {
   BadgeCheck,
   AlertTriangle,
   Bot,
-  CheckCircle2,
-  Clock3,
   Cpu,
   EyeOff,
   Gauge,
@@ -26,6 +24,7 @@ import { PageHeader } from '../components/PageHeader';
 import { RunnerClaimMarket } from '../components/RunnerClaimMarket';
 import { LiveStatus } from '../components/Status';
 import { useLiveEvents } from '../hooks/useLiveEvents';
+import { useI18n } from '../i18n';
 import { api, ApiError, normalizeList } from '../lib/api';
 import { credits, duration, percent, relativeTime } from '../lib/format';
 import { isOfficialRunner } from '../lib/officialFleet';
@@ -44,7 +43,126 @@ const CLAIM_COMMAND =
   'agentpool claim --pool <pool-id> --units 3 --agent codex --model <exact-model>';
 const WEBHOOK_CLAIM_COMMAND = `${CLAIM_COMMAND} --allow-webhooks`;
 
+function RunnerSetup() {
+  const { t } = useI18n();
+  return (
+    <>
+      <section className="runner-intro">
+        <div className="runner-orbit" aria-hidden="true">
+          <span className="orbit orbit-one" />
+          <span className="orbit orbit-two" />
+          <div>
+            <Bot />
+          </div>
+          <i className="orbit-node node-one" />
+          <i className="orbit-node node-two" />
+          <i className="orbit-node node-three" />
+        </div>
+        <div>
+          <h2>{t('run.keysStayTitle')}</h2>
+          <p>{t('run.keysStayBody')}</p>
+          <CopyCommand command={INSTALL_COMMAND} />
+        </div>
+      </section>
+
+      <section className="runner-steps page-section">
+        <div className="section-bar">
+          <div>
+            <h2>{t('run.installThenClaim')}</h2>
+          </div>
+        </div>
+        <div className="runner-step-list">
+          <article>
+            <span className="runner-step-number">01</span>
+            <div className="runner-step-icon">
+              <TerminalSquare aria-hidden="true" />
+            </div>
+            <div>
+              <h3>{t('run.step1Title')}</h3>
+              <p>{t('run.step1Body')}</p>
+              <CopyCommand command={INSTALL_COMMAND} />
+            </div>
+          </article>
+          <article>
+            <span className="runner-step-number">02</span>
+            <div className="runner-step-icon">
+              <KeyRound aria-hidden="true" />
+            </div>
+            <div>
+              <h3>{t('run.step2Title')}</h3>
+              <p>{t('run.step2Body')}</p>
+              <CopyCommand command={LOGIN_COMMAND} />
+            </div>
+          </article>
+          <article>
+            <span className="runner-step-number">03</span>
+            <div className="runner-step-icon">
+              <BadgeCheck aria-hidden="true" />
+            </div>
+            <div>
+              <h3>{t('run.step3Title')}</h3>
+              <p>{t('run.step3Body')}</p>
+              <CopyCommand command={BENCHMARK_COMMAND} />
+              <small>
+                {t('run.step3HintBefore')} <code>&lt;exact-model&gt;</code> {t('run.step3HintMid')}{' '}
+                <code>--agent</code> {t('run.step3HintAfter')} <code>claude</code>.
+              </small>
+            </div>
+          </article>
+          <article>
+            <span className="runner-step-number">04</span>
+            <div className="runner-step-icon">
+              <RadioTower aria-hidden="true" />
+            </div>
+            <div>
+              <h3>{t('run.step4Title')}</h3>
+              <p>{t('run.step4Body')}</p>
+              <CopyCommand command={CLAIM_COMMAND} />
+              <div className="runner-webhook-optin">
+                <header>
+                  <Webhook aria-hidden="true" />
+                  <div>
+                    <strong>{t('run.webhookTitle')}</strong>
+                  </div>
+                </header>
+                <p>
+                  {t('run.webhookBodyBefore')} <code>--allow-webhooks</code>
+                  {t('run.webhookBodyAfter')}
+                </p>
+                <CopyCommand command={WEBHOOK_CLAIM_COMMAND} />
+                <span>
+                  <AlertTriangle aria-hidden="true" /> {t('run.webhookWarn')}
+                </span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section className="sealed-boundary">
+        <div>
+          <LockKeyhole aria-hidden="true" />
+          <strong>{t('run.pageBlind')}</strong>
+        </div>
+        <p>{t('run.pageBlindBody')}</p>
+        <div className="boundary-flow" aria-label={t('run.visibleAria')}>
+          <span>
+            <EyeOff aria-hidden="true" /> {t('run.thisPage')}
+          </span>
+          <i />
+          <strong>{t('run.progressCredits')}</strong>
+          <i className="blocked" />
+          <span>
+            <ShieldCheck aria-hidden="true" /> {t('run.promptsAnswers')}
+          </span>
+        </div>
+      </section>
+    </>
+  );
+}
+
 export function RunAgentPage() {
+  const { t } = useI18n();
   const [nodes, setNodes] = useState<RunnerNodePublic[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,35 +174,41 @@ export function RunAgentPage() {
   const [changingFleetMode, setChangingFleetMode] = useState<OfficialFleetMode | null>(null);
   const refreshTimer = useRef<number | undefined>(undefined);
 
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) setLoading(true);
-    try {
-      setNodes(normalizeList(await api.runners()));
-      setError(null);
-    } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : '无法读取 Runner 状态');
-    } finally {
-      if (!quiet) setLoading(false);
-    }
-  }, []);
+  const load = useCallback(
+    async (quiet = false) => {
+      if (!quiet) setLoading(true);
+      try {
+        setNodes(normalizeList(await api.runners()));
+        setError(null);
+      } catch (requestError) {
+        setError(requestError instanceof ApiError ? requestError.message : t('run.loadError'));
+      } finally {
+        if (!quiet) setLoading(false);
+      }
+    },
+    [t],
+  );
 
-  const loadMarket = useCallback(async (quiet = false) => {
-    if (!quiet) setLoadingMarket(true);
-    try {
-      const [publicPools, ownedPools] = await Promise.all([
-        api.runnerMarketPools(),
-        api.listPools(),
-      ]);
-      setMarketPools(mergeMarketPools(publicPools, ownedPools));
-      setMarketError(null);
-    } catch (requestError) {
-      setMarketError(
-        requestError instanceof ApiError ? requestError.message : '无法读取 Runner 任务市场',
-      );
-    } finally {
-      if (!quiet) setLoadingMarket(false);
-    }
-  }, []);
+  const loadMarket = useCallback(
+    async (quiet = false) => {
+      if (!quiet) setLoadingMarket(true);
+      try {
+        const [publicPools, ownedPools] = await Promise.all([
+          api.runnerMarketPools(),
+          api.listPools(),
+        ]);
+        setMarketPools(mergeMarketPools(publicPools, ownedPools));
+        setMarketError(null);
+      } catch (requestError) {
+        setMarketError(
+          requestError instanceof ApiError ? requestError.message : t('run.marketError'),
+        );
+      } finally {
+        if (!quiet) setLoadingMarket(false);
+      }
+    },
+    [t],
+  );
 
   const loadOfficialFleet = useCallback(async () => {
     try {
@@ -97,10 +221,10 @@ export function RunAgentPage() {
         return;
       }
       setOfficialFleetError(
-        requestError instanceof ApiError ? requestError.message : '无法读取 Official Fleet',
+        requestError instanceof ApiError ? requestError.message : t('run.fleetError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -138,24 +262,24 @@ export function RunAgentPage() {
       setOfficialFleet(await api.updateOfficialFleet(mode));
     } catch (requestError) {
       setOfficialFleetError(
-        requestError instanceof ApiError ? requestError.message : 'Official Fleet 模式切换失败',
+        requestError instanceof ApiError ? requestError.message : t('run.fleetSwitchError'),
       );
     } finally {
       setChangingFleetMode(null);
     }
   };
 
-  if (loading && !nodes.length) return <LoadingState label="正在加载" />;
+  if (loading && !nodes.length) return <LoadingState label={t('common.loading')} />;
 
   const paired = nodes.length > 0;
 
   return (
     <div className="page run-agent-page">
-      <DocumentTitle title="接活" />
+      <DocumentTitle title={t('run.title')} />
       <PageHeader
-        eyebrow="运行 Agent"
-        title="领一批，在自己的电脑上跑。"
-        description="网页只生成领取单。真正执行还要在已登录的 Codex、Claude 或本地 mock 上跑命令。"
+        eyebrow={t('run.eyebrow')}
+        title={t('run.heading')}
+        description={t('run.description')}
         actions={<LiveStatus state={state} />}
       />
       {error ? <InlineError message={error} retry={() => void load()} /> : null}
@@ -180,240 +304,25 @@ export function RunAgentPage() {
 
       {paired ? (
         <details className="runner-setup-details">
-          <summary>安装与领取命令</summary>
-          <section className="runner-intro">
-            <div className="runner-orbit" aria-hidden="true">
-              <span className="orbit orbit-one" />
-              <span className="orbit orbit-two" />
-              <div>
-                <Bot />
-              </div>
-              <i className="orbit-node node-one" />
-              <i className="orbit-node node-two" />
-              <i className="orbit-node node-three" />
-            </div>
-            <div>
-              <h2>密钥留在这台电脑。</h2>
-              <p>用本机已登录的 Codex 或 Claude 来做。题目不会出现在这个页面。</p>
-              <CopyCommand command={INSTALL_COMMAND} />
-            </div>
-          </section>
-
-          <section className="runner-steps page-section">
-            <div className="section-bar">
-              <div>
-                <h2>安装、登录、再领一批</h2>
-              </div>
-            </div>
-            <div className="runner-step-list">
-              <article>
-                <span className="runner-step-number">01</span>
-                <div className="runner-step-icon">
-                  <TerminalSquare aria-hidden="true" />
-                </div>
-                <div>
-                  <h3>安装 Runner</h3>
-                  <p>下载命令行工具。不会改你已经装好的 Agent。</p>
-                  <CopyCommand command={INSTALL_COMMAND} />
-                </div>
-              </article>
-              <article>
-                <span className="runner-step-number">02</span>
-                <div className="runner-step-icon">
-                  <KeyRound aria-hidden="true" />
-                </div>
-                <div>
-                  <h3>登录账户</h3>
-                  <p>终端会给出一串设备码，回到这里确认这台电脑。</p>
-                  <CopyCommand command={LOGIN_COMMAND} />
-                </div>
-              </article>
-              <article>
-                <span className="runner-step-number">03</span>
-                <div className="runner-step-icon">
-                  <BadgeCheck aria-hidden="true" />
-                </div>
-                <div>
-                  <h3>先跑一遍能力检查</h3>
-                  <p>在这台电脑上测一下速度和能不能做对，之后才好领匹配的任务。</p>
-                  <CopyCommand command={BENCHMARK_COMMAND} />
-                  <small>
-                    把 <code>&lt;exact-model&gt;</code> 换成实际模型名。用 Claude 时把
-                    <code>--agent</code> 改成 <code>claude</code>。
-                  </small>
-                </div>
-              </article>
-              <article>
-                <span className="runner-step-number">04</span>
-                <div className="runner-step-icon">
-                  <RadioTower aria-hidden="true" />
-                </div>
-                <div>
-                  <h3>领一批来做</h3>
-                  <p>在上面选好机器和数量，到这台电脑运行命令。做完这一批就会停。</p>
-                  <CopyCommand command={CLAIM_COMMAND} />
-                  <div className="runner-webhook-optin">
-                    <header>
-                      <Webhook aria-hidden="true" />
-                      <div>
-                        <strong>可选：把结果发到对方地址</strong>
-                      </div>
-                    </header>
-                    <p>
-                      本机领取这类任务时要加上 <code>--allow-webhooks</code>
-                      。对方会看到你的网络来源。
-                    </p>
-                    <CopyCommand command={WEBHOOK_CLAIM_COMMAND} />
-                    <span>
-                      <AlertTriangle aria-hidden="true" /> 默认关闭。不确定就别开。
-                    </span>
-                  </div>
-                </div>
-              </article>
-            </div>
-          </section>
-
-          <section className="sealed-boundary">
-            <div>
-              <LockKeyhole aria-hidden="true" />
-              <strong>这个页面看不到题目</strong>
-            </div>
-            <p>这里只显示进度和积分。题目和答案留在执行的那台电脑上。</p>
-            <div className="boundary-flow" aria-label="可见范围">
-              <span>
-                <EyeOff aria-hidden="true" /> 这个页面
-              </span>
-              <i />
-              <strong>进度 / 积分</strong>
-              <i className="blocked" />
-              <span>
-                <ShieldCheck aria-hidden="true" /> 题目和答案
-              </span>
-            </div>
-          </section>
+          <summary>{t('run.setupSummary')}</summary>
+          <RunnerSetup />
         </details>
       ) : (
         <div className="runner-setup-unpaired">
-          <section className="runner-intro">
-            <div className="runner-orbit" aria-hidden="true">
-              <span className="orbit orbit-one" />
-              <span className="orbit orbit-two" />
-              <div>
-                <Bot />
-              </div>
-              <i className="orbit-node node-one" />
-              <i className="orbit-node node-two" />
-              <i className="orbit-node node-three" />
-            </div>
-            <div>
-              <h2>密钥留在这台电脑。</h2>
-              <p>用本机已登录的 Codex 或 Claude 来做。题目不会出现在这个页面。</p>
-              <CopyCommand command={INSTALL_COMMAND} />
-            </div>
-          </section>
-
-          <section className="runner-steps page-section">
-            <div className="section-bar">
-              <div>
-                <h2>安装、登录、再领一批</h2>
-              </div>
-            </div>
-            <div className="runner-step-list">
-              <article>
-                <span className="runner-step-number">01</span>
-                <div className="runner-step-icon">
-                  <TerminalSquare aria-hidden="true" />
-                </div>
-                <div>
-                  <h3>安装 Runner</h3>
-                  <p>下载命令行工具。不会改你已经装好的 Agent。</p>
-                  <CopyCommand command={INSTALL_COMMAND} />
-                </div>
-              </article>
-              <article>
-                <span className="runner-step-number">02</span>
-                <div className="runner-step-icon">
-                  <KeyRound aria-hidden="true" />
-                </div>
-                <div>
-                  <h3>登录账户</h3>
-                  <p>终端会给出一串设备码，回到这里确认这台电脑。</p>
-                  <CopyCommand command={LOGIN_COMMAND} />
-                </div>
-              </article>
-              <article>
-                <span className="runner-step-number">03</span>
-                <div className="runner-step-icon">
-                  <BadgeCheck aria-hidden="true" />
-                </div>
-                <div>
-                  <h3>先跑一遍能力检查</h3>
-                  <p>在这台电脑上测一下速度和能不能做对，之后才好领匹配的任务。</p>
-                  <CopyCommand command={BENCHMARK_COMMAND} />
-                  <small>
-                    把 <code>&lt;exact-model&gt;</code> 换成实际模型名。用 Claude 时把
-                    <code>--agent</code> 改成 <code>claude</code>。
-                  </small>
-                </div>
-              </article>
-              <article>
-                <span className="runner-step-number">04</span>
-                <div className="runner-step-icon">
-                  <RadioTower aria-hidden="true" />
-                </div>
-                <div>
-                  <h3>领一批来做</h3>
-                  <p>在上面选好机器和数量，到这台电脑运行命令。做完这一批就会停。</p>
-                  <CopyCommand command={CLAIM_COMMAND} />
-                  <div className="runner-webhook-optin">
-                    <header>
-                      <Webhook aria-hidden="true" />
-                      <div>
-                        <strong>可选：把结果发到对方地址</strong>
-                      </div>
-                    </header>
-                    <p>
-                      本机领取这类任务时要加上 <code>--allow-webhooks</code>
-                      。对方会看到你的网络来源。
-                    </p>
-                    <CopyCommand command={WEBHOOK_CLAIM_COMMAND} />
-                    <span>
-                      <AlertTriangle aria-hidden="true" /> 默认关闭。不确定就别开。
-                    </span>
-                  </div>
-                </div>
-              </article>
-            </div>
-          </section>
-
-          <section className="sealed-boundary">
-            <div>
-              <LockKeyhole aria-hidden="true" />
-              <strong>这个页面看不到题目</strong>
-            </div>
-            <p>这里只显示进度和积分。题目和答案留在执行的那台电脑上。</p>
-            <div className="boundary-flow" aria-label="可见范围">
-              <span>
-                <EyeOff aria-hidden="true" /> 这个页面
-              </span>
-              <i />
-              <strong>进度 / 积分</strong>
-              <i className="blocked" />
-              <span>
-                <ShieldCheck aria-hidden="true" /> 题目和答案
-              </span>
-            </div>
-          </section>
+          <RunnerSetup />
         </div>
       )}
 
       <section className="page-section">
         <div className="section-bar">
           <div>
-            <h2>已连接的执行节点</h2>
+            <h2>{t('run.connectedNodes')}</h2>
           </div>
           <span>
-            {nodes.filter((node) => node.status === 'online').length} 在线 / {nodes.length} 总计
+            {t('run.onlineTotal', {
+              online: nodes.filter((node) => node.status === 'online').length,
+              total: nodes.length,
+            })}
           </span>
         </div>
         {nodes.length ? (
@@ -424,8 +333,8 @@ export function RunAgentPage() {
           </div>
         ) : (
           <EmptyState
-            title="还没有 Runner 连接"
-            detail="在自己的 Mac 或 Linux 机器执行上面的安装命令，然后通过一次性设备码连接。"
+            title={t('run.noRunnerTitle')}
+            detail={t('run.noRunnerDetail')}
             action={<CopyCommand command={INSTALL_COMMAND} />}
           />
         )}
@@ -435,10 +344,17 @@ export function RunAgentPage() {
 }
 
 function RunnerNodeCard({ node }: { node: RunnerNodePublic }) {
+  const { t } = useI18n();
   const activeCount = Math.max(node.activeLeases, node.activeJobs.length);
   const validCertifications = node.certifications.filter(
     (certification) => Date.parse(certification.expiresAt) > Date.now(),
   );
+  const statusLabel =
+    node.status === 'online'
+      ? t('common.online')
+      : node.status === 'paused'
+        ? t('common.paused')
+        : t('common.offline');
 
   return (
     <article className="node-card">
@@ -454,26 +370,24 @@ function RunnerNodeCard({ node }: { node: RunnerNodePublic }) {
         <div className="node-status-stack">
           {isOfficialRunner(node) ? (
             <span className="official-node-badge">
-              <ServerCog aria-hidden="true" /> 官方
+              <ServerCog aria-hidden="true" /> {t('common.official')}
             </span>
           ) : null}
-          <span className={`node-status node-status-${node.status}`}>
-            {node.status === 'online' ? '在线' : node.status === 'paused' ? '已暂停' : '离线'}
-          </span>
+          <span className={`node-status node-status-${node.status}`}>{statusLabel}</span>
         </div>
       </header>
       <div className="node-target">
         <div>
           <Cpu aria-hidden="true" />
           <span>
-            <small>平台</small>
-            <strong>{node.platform || '未上报平台信息'}</strong>
+            <small>{t('run.platform')}</small>
+            <strong>{node.platform || t('common.platformUnknown')}</strong>
           </span>
         </div>
         <div>
           <Gauge aria-hidden="true" />
           <span>
-            <small>占用 / 上限</small>
+            <small>{t('run.occupancy')}</small>
             <strong>
               {node.activeLeases} / {node.maxConcurrency}
             </strong>
@@ -482,8 +396,8 @@ function RunnerNodeCard({ node }: { node: RunnerNodePublic }) {
         <div>
           <RadioTower aria-hidden="true" />
           <span>
-            <small>进行中的任务</small>
-            <strong>{activeCount} 条</strong>
+            <small>{t('run.activeUnits')}</small>
+            <strong>{t('run.unitCount', { count: activeCount })}</strong>
           </span>
         </div>
       </div>
@@ -492,8 +406,8 @@ function RunnerNodeCard({ node }: { node: RunnerNodePublic }) {
         <header>
           <BadgeCheck aria-hidden="true" />
           <div>
-            <strong>能力记录</strong>
-            <small>{validCertifications.length} 个有效精确组合 · 不证明模型身份</small>
+            <strong>{t('run.certsTitle')}</strong>
+            <small>{t('run.certsMeta', { count: validCertifications.length })}</small>
           </div>
         </header>
         {validCertifications.length ? (
@@ -505,23 +419,25 @@ function RunnerNodeCard({ node }: { node: RunnerNodePublic }) {
                 <strong>
                   {certification.adapter} / {certification.model}
                 </strong>
-                <span>P95 {duration(certification.p95Ms / 1000)}</span>
-                <span>并发证据 {certification.certifiedConcurrency}</span>
-                <span>成功率 {percent(certification.successRate)}</span>
-                <small>{relativeTime(certification.expiresAt)}到期</small>
+                <span>{t('run.p95', { value: duration(certification.p95Ms / 1000) })}</span>
+                <span>
+                  {t('run.concurrencyEvidence', { count: certification.certifiedConcurrency })}
+                </span>
+                <span>{t('run.successRate', { value: percent(certification.successRate) })}</span>
+                <small>{t('run.expires', { time: relativeTime(certification.expiresAt) })}</small>
               </article>
             ))}
           </div>
         ) : (
-          <p>还没有能力记录。先跑下面的检查，才能领到对得上的任务。</p>
+          <p>{t('run.noCerts')}</p>
         )}
         <CopyCommand command={BENCHMARK_COMMAND} />
       </div>
 
       <div className="node-jobs">
         <div className="node-jobs-head">
-          <strong>正在做的</strong>
-          <span>只显示进度和积分</span>
+          <strong>{t('run.doingNow')}</strong>
+          <span>{t('run.progressOnly')}</span>
         </div>
         <div className="node-aggregate">
           <span
@@ -530,16 +446,16 @@ function RunnerNodeCard({ node }: { node: RunnerNodePublic }) {
           />
           <div>
             <strong>
-              {activeCount ? `${activeCount} 条任务正在执行` : '当前没有进行中的任务'}
+              {activeCount ? t('run.jobsRunning', { count: activeCount }) : t('run.jobsIdle')}
             </strong>
-            <small>{activeCount ? '进行中' : '现在空闲'}</small>
+            <small>{activeCount ? t('run.inProgress') : t('run.idleNow')}</small>
           </div>
         </div>
         {node.activeJobs.length ? (
-          <ol className="aggregate-job-list" aria-label="匿名活跃任务进度">
+          <ol className="aggregate-job-list" aria-label={t('run.jobsAria')}>
             {node.activeJobs.map((job, index) => (
               <li key={`${job.stage}-${index}`}>
-                <span>任务 {String(index + 1).padStart(2, '0')}</span>
+                <span>{t('run.jobN', { n: String(index + 1).padStart(2, '0') })}</span>
                 <strong>{job.stage}</strong>
                 <span>{percent(job.progress)}</span>
                 <span>{credits(job.reward)}</span>
@@ -549,8 +465,8 @@ function RunnerNodeCard({ node }: { node: RunnerNodePublic }) {
         ) : null}
       </div>
       <footer>
-        <span>Runner {node.runnerVersion || '—'}</span>
-        <span>最后信号 {relativeTime(node.lastSeenAt)}</span>
+        <span>{t('run.runnerVersion', { version: node.runnerVersion || '—' })}</span>
+        <span>{t('run.lastSignal', { time: relativeTime(node.lastSeenAt) })}</span>
       </footer>
     </article>
   );

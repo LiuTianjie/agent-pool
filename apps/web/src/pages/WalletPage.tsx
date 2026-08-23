@@ -16,31 +16,15 @@ import { DocumentTitle } from '../components/DocumentTitle';
 import { EmptyState, InlineError, LoadingState } from '../components/LoadingState';
 import { PageHeader } from '../components/PageHeader';
 import { WalletGrid } from '../components/WalletGrid';
+import { useI18n } from '../i18n';
 import { api, ApiError, normalizeList } from '../lib/api';
 import { credits, fullDateTime } from '../lib/format';
 import type { LedgerEntry } from '../lib/types';
 
 const TOP_UP_OPTIONS = [1_000, 5_000, 20_000, 100_000];
 
-const ENTRY_LABEL: Record<LedgerEntry['kind'], string> = {
-  topup: '增加积分',
-  lock: '发布任务锁定',
-  unlock: '未执行积分解锁',
-  self_settlement: '自己跑通',
-  earning_pending: '交付待结算',
-  earning_settled: '收益已结算',
-  withdrawal: '转出',
-  adjustment: '账本调整',
-};
-
-const BUCKET_LABEL: Record<keyof WalletSummary, string> = {
-  purchasedAvailable: '可消费',
-  purchasedLocked: '任务锁定',
-  earnedPending: '待结算收益',
-  earnedAvailable: '可转出收益',
-};
-
 export function WalletPage() {
+  const { t } = useI18n();
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +37,24 @@ export function WalletPage() {
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawalNotice, setWithdrawalNotice] = useState<string | null>(null);
 
+  const entryLabel: Record<LedgerEntry['kind'], string> = {
+    topup: t('wallet.kindTopup'),
+    lock: t('wallet.kindLock'),
+    unlock: t('wallet.kindUnlock'),
+    self_settlement: t('wallet.kindSelf'),
+    earning_pending: t('wallet.kindPending'),
+    earning_settled: t('wallet.kindSettled'),
+    withdrawal: t('wallet.kindWithdraw'),
+    adjustment: t('wallet.kindAdjust'),
+  };
+
+  const bucketLabel: Record<keyof WalletSummary, string> = {
+    purchasedAvailable: t('wallet.bucketSpendable'),
+    purchasedLocked: t('wallet.bucketLocked'),
+    earnedPending: t('wallet.bucketPending'),
+    earnedAvailable: t('wallet.bucketWithdrawable'),
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -61,11 +63,11 @@ export function WalletPage() {
       setEntries(normalizeList(ledgerResult));
       setError(null);
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : '无法读取积分');
+      setError(requestError instanceof ApiError ? requestError.message : t('wallet.loadError'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -73,7 +75,7 @@ export function WalletPage() {
 
   const topUp = async () => {
     if (topUpAmount < 1 || topUpAmount > 1_000_000) {
-      setError('一次可以增加 1–1,000,000 积分');
+      setError(t('wallet.topupRange'));
       return;
     }
     setToppingUp(true);
@@ -84,7 +86,7 @@ export function WalletPage() {
       const ledgerResult = await api.ledger();
       setEntries(normalizeList(ledgerResult));
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : '增加积分失败');
+      setError(requestError instanceof ApiError ? requestError.message : t('wallet.topupFailed'));
     } finally {
       setToppingUp(false);
     }
@@ -93,7 +95,7 @@ export function WalletPage() {
   const withdraw = async () => {
     if (!wallet) return;
     if (withdrawAmount < 1 || withdrawAmount > wallet.earnedAvailable) {
-      setError('只能从可转出收益中选择有效数量');
+      setError(t('wallet.withdrawRange'));
       return;
     }
     setWithdrawing(true);
@@ -101,27 +103,29 @@ export function WalletPage() {
     try {
       const result = await api.devWithdraw(Math.trunc(withdrawAmount));
       setWallet(result.wallet);
-      setWithdrawalNotice('已记下一笔转出，没有真实打款。');
+      setWithdrawalNotice(t('wallet.withdrawNotice'));
       setWithdrawOpen(false);
       setEntries(normalizeList(await api.ledger()));
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : '模拟转出失败');
+      setError(
+        requestError instanceof ApiError ? requestError.message : t('wallet.withdrawFailed'),
+      );
     } finally {
       setWithdrawing(false);
     }
   };
 
-  if (loading && !wallet) return <LoadingState label="正在读取积分" />;
+  if (loading && !wallet) return <LoadingState label={t('wallet.loading')} />;
   if (error && !wallet) return <InlineError message={error} retry={() => void load()} />;
   if (!wallet) return null;
 
   return (
     <div className="page wallet-page">
-      <DocumentTitle title="积分" />
+      <DocumentTitle title={t('wallet.title')} />
       <PageHeader
-        eyebrow="积分"
-        title="积分"
-        description="发布任务用可消费积分，做完任务赚到的进收益。现在还不是真钱。"
+        eyebrow={t('wallet.title')}
+        title={t('wallet.heading')}
+        description={t('wallet.description')}
         actions={
           <>
             <button
@@ -133,14 +137,14 @@ export function WalletPage() {
                 setWithdrawOpen(true);
               }}
             >
-              <ArrowUpFromLine aria-hidden="true" /> 转出
+              <ArrowUpFromLine aria-hidden="true" /> {t('wallet.withdraw')}
             </button>
             <button
               className="button button-primary"
               type="button"
               onClick={() => setTopUpOpen(true)}
             >
-              <Plus aria-hidden="true" /> 增加积分
+              <Plus aria-hidden="true" /> {t('wallet.topup')}
             </button>
           </>
         }
@@ -159,8 +163,8 @@ export function WalletPage() {
             <ArrowDownLeft aria-hidden="true" />
           </span>
           <div>
-            <h2>增加的积分</h2>
-            <p>用来发布任务，不能转给别人，也不能转出。</p>
+            <h2>{t('wallet.addedTitle')}</h2>
+            <p>{t('wallet.addedBody')}</p>
           </div>
         </article>
         <span className="boundary-divider">
@@ -171,8 +175,8 @@ export function WalletPage() {
             <ArrowUpRight aria-hidden="true" />
           </span>
           <div>
-            <h2>赚来的积分</h2>
-            <p>任务通过后先待结算，再进入可转出。</p>
+            <h2>{t('wallet.earnedTitle')}</h2>
+            <p>{t('wallet.earnedBody')}</p>
           </div>
         </article>
       </section>
@@ -180,29 +184,29 @@ export function WalletPage() {
       <section className="ledger-section page-section">
         <div className="section-bar">
           <div>
-            <h2>最近账目</h2>
+            <h2>{t('wallet.recent')}</h2>
           </div>
-          <span>{entries.length} 笔</span>
+          <span>{t('wallet.entryCount', { count: entries.length })}</span>
         </div>
         {entries.length ? (
-          <div className="ledger-table" role="table" aria-label="积分流水">
+          <div className="ledger-table" role="table" aria-label={t('wallet.tableAria')}>
             <div className="ledger-head" role="row">
-              <span>类型</span>
-              <span>说明</span>
-              <span>账户</span>
-              <span>时间</span>
-              <span>金额</span>
+              <span>{t('wallet.colType')}</span>
+              <span>{t('wallet.colNote')}</span>
+              <span>{t('wallet.colBucket')}</span>
+              <span>{t('wallet.colTime')}</span>
+              <span>{t('wallet.colAmount')}</span>
             </div>
             {entries.map((entry) => (
               <div className="ledger-row" role="row" key={entry.id}>
                 <span className={`ledger-kind ledger-${entry.kind}`}>
-                  <ReceiptText aria-hidden="true" /> {ENTRY_LABEL[entry.kind]}
+                  <ReceiptText aria-hidden="true" /> {entryLabel[entry.kind]}
                 </span>
                 <div>
                   <strong>{entry.description}</strong>
                   {entry.referenceId ? <small>REF / {entry.referenceId.slice(0, 12)}</small> : null}
                 </div>
-                <span>{BUCKET_LABEL[entry.balanceBucket]}</span>
+                <span>{bucketLabel[entry.balanceBucket]}</span>
                 <time dateTime={entry.createdAt}>{fullDateTime(entry.createdAt)}</time>
                 <strong className={entry.amount >= 0 ? 'amount-positive' : 'amount-negative'}>
                   {entry.amount >= 0 ? '+' : ''}
@@ -212,17 +216,14 @@ export function WalletPage() {
             ))}
           </div>
         ) : (
-          <EmptyState
-            title="账本还是空的"
-            detail="增加积分或做完第一条任务后，流水会出现在这里。"
-          />
+          <EmptyState title={t('wallet.emptyTitle')} detail={t('wallet.emptyDetail')} />
         )}
       </section>
 
       <aside className="dev-money-note">
         <Info aria-hidden="true" />
         <p>
-          <strong>现在还不是真钱。</strong>增加和转出都只记账，充值和收益分开算。
+          <strong>{t('wallet.devNoteTitle')}</strong> {t('wallet.devNote')}
         </p>
       </aside>
 
@@ -241,8 +242,8 @@ export function WalletPage() {
             <div className="dialog-icon dialog-icon-lime">
               <WalletCards aria-hidden="true" />
             </div>
-            <h2 id="topup-title">增加积分</h2>
-            <p>现在只是记账，这些积分只能用来发布任务。</p>
+            <h2 id="topup-title">{t('wallet.topupTitle')}</h2>
+            <p>{t('wallet.topupLead')}</p>
             <div className="topup-options">
               {TOP_UP_OPTIONS.map((amount) => (
                 <button
@@ -256,7 +257,7 @@ export function WalletPage() {
               ))}
             </div>
             <label className="field">
-              <span>自定义数量</span>
+              <span>{t('wallet.customAmount')}</span>
               <span className="input-shell">
                 <CircleDollarSign aria-hidden="true" />
                 <input
@@ -270,7 +271,7 @@ export function WalletPage() {
             </label>
             <div className="topup-assurance">
               <ShieldCheck aria-hidden="true" />
-              <span>加进来的积分不能转出。</span>
+              <span>{t('wallet.topupLock')}</span>
             </div>
             <div className="dialog-actions">
               <button
@@ -278,7 +279,7 @@ export function WalletPage() {
                 type="button"
                 onClick={() => setTopUpOpen(false)}
               >
-                取消
+                {t('common.cancel')}
               </button>
               <button
                 className="button button-primary"
@@ -286,7 +287,9 @@ export function WalletPage() {
                 disabled={toppingUp}
                 onClick={() => void topUp()}
               >
-                {toppingUp ? '正在入账…' : `增加 ${credits(topUpAmount)}`}
+                {toppingUp
+                  ? t('wallet.topping')
+                  : t('wallet.topupAction', { amount: credits(topUpAmount) })}
               </button>
             </div>
           </section>
@@ -308,10 +311,10 @@ export function WalletPage() {
             <div className="dialog-icon dialog-icon-lime">
               <ArrowUpFromLine aria-hidden="true" />
             </div>
-            <h2 id="withdraw-title">转出收益</h2>
-            <p>现在只从可转出收益里扣一笔账，不会打到银行卡。</p>
+            <h2 id="withdraw-title">{t('wallet.withdrawTitle')}</h2>
+            <p>{t('wallet.withdrawLead')}</p>
             <label className="field">
-              <span>从可转出收益扣减</span>
+              <span>{t('wallet.withdrawFrom')}</span>
               <span className="input-shell">
                 <CircleDollarSign aria-hidden="true" />
                 <input
@@ -322,11 +325,11 @@ export function WalletPage() {
                   onChange={(event) => setWithdrawAmount(Number(event.target.value))}
                 />
               </span>
-              <small>当前最多 {credits(wallet.earnedAvailable)}。用来发布的积分不能转出。</small>
+              <small>{t('wallet.withdrawMax', { amount: credits(wallet.earnedAvailable) })}</small>
             </label>
             <div className="topup-assurance">
               <ShieldCheck aria-hidden="true" />
-              <span>这是演示转出，用来看账怎么走。</span>
+              <span>{t('wallet.withdrawDemo')}</span>
             </div>
             <div className="dialog-actions">
               <button
@@ -334,7 +337,7 @@ export function WalletPage() {
                 type="button"
                 onClick={() => setWithdrawOpen(false)}
               >
-                取消
+                {t('common.cancel')}
               </button>
               <button
                 className="button button-primary"
@@ -344,7 +347,9 @@ export function WalletPage() {
                 }
                 onClick={() => void withdraw()}
               >
-                {withdrawing ? '正在处理…' : `转出 ${credits(withdrawAmount)}`}
+                {withdrawing
+                  ? t('wallet.withdrawing')
+                  : t('wallet.withdrawAction', { amount: credits(withdrawAmount) })}
               </button>
             </div>
           </section>
