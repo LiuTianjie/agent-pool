@@ -237,12 +237,12 @@ docker compose --env-file .env up --build
 
 1. 安装锁定依赖。
 2. 运行格式、类型和包含真实 PostgreSQL 的完整测试。
-3. 构建 `linux/amd64` Docker 镜像并发布到 GHCR。
-4. 把 GHCR 产出的不可变 `sha256` digest 交给 Luma。
-5. Builder 不走代理，直接从 `ghcr.io` 拉取并复制到 Luma 内部 Registry。
+3. 向独立 Builder 提交本次 Git SHA，构建 `linux/amd64` 镜像并推送到 ACR。
+4. 从成功结果读取 app 的不可变 digest。
+5. 生成运行版 Compose，沿用原 image-deploy 路径。
 6. Luma 更新 Nomad、等待健康、探测公网和 Control protocol。
 
-仓库需要 `LUMA_CONTROL_URL` repository variable 和 `LUMA_DEPLOY_TOKEN` repository secret；GHCR 使用工作流的短期 `GITHUB_TOKEN`。运行时 secrets 保留在 Luma scope，不进入仓库和镜像。
+仓库需要 `LUMA_CONTROL_URL` repository variable 和 `LUMA_DEPLOY_TOKEN` repository secret；GitHub 读取和 ACR Push 凭据由独立 Builder 保管，CI 只提交构建并部署结果。运行时 secrets 保留在 Luma scope，不进入仓库和镜像。
 
 PostgreSQL 使用 manager 节点本地 `ReadWriteOnce` 目录 `/srv/agent-pool/postgres`，没有 NFS。它是单节点持久化，必须单独做备份与恢复演练，迁移节点前先迁移数据库数据。
 
@@ -256,7 +256,7 @@ PostgreSQL 使用 manager 节点本地 `ReadWriteOnce` 目录 `/srv/agent-pool/p
 - fresh PostgreSQL 从 001–009 迁移后的 API 集成测试。
 - Community、Official 和 Control 的 packaged mock 全链路 smoke。
 - Claim 原子额度、无 Claim 不派单、自跑只消耗预算、Pilot、验收、退款、幂等、凭证撤销、合同 hash、Webhook 签名和敏感信息不回显测试。
-- `main → GHCR → Builder → Luma → 公网健康检查` 的实际部署证据。
+- 旧 `main → GHCR → Builder → Luma → 公网健康检查` 的历史部署证据；不代表新的 ACR 路径已完成线上发布。
 
 尚未完成或不应承诺：
 

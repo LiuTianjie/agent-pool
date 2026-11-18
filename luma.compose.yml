@@ -1,5 +1,5 @@
 name: agent-pool
-compose: docker-compose.deploy.yml
+compose: docker-compose.build.yml
 region: cn
 
 volumes:

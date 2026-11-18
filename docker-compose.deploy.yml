@@ -1,7 +1,7 @@
 services:
   app:
     platform: linux/amd64
-    image: ghcr.io/liutianjie/agent-pool:latest
+    image: ${AGENT_POOL_IMAGE:?Set the immutable image returned by Builder}
     environment:
       NODE_ENV: production
       PORT: '3000'

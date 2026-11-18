@@ -146,11 +146,11 @@ docker compose --env-file .env up --build
 
 服务默认监听 `http://localhost:3000`。API 启动时自动执行数据库迁移。
 
-当前 Compose / Luma 清单只给 PostgreSQL 使用单节点本地 `ReadWriteOnce` 数据卷（`/srv/agent-pool/postgres`），没有 NFS。应用以 GHCR 的不可变 digest 镜像运行；本地卷意味着数据库实例应固定在该节点，并配套做 PostgreSQL 备份后再考虑迁移节点。
+当前 Compose / Luma 清单只给 PostgreSQL 使用单节点本地 `ReadWriteOnce` 数据卷（`/srv/agent-pool/postgres`），没有 NFS。应用以独立 Builder 返回的 ACR 不可变 digest 镜像运行；本地卷意味着数据库实例应固定在该节点，并配套做 PostgreSQL 备份后再考虑迁移节点。
 
 ### GitHub Actions 部署
 
-主分支与 Pull Request 会运行 [CI](./.github/workflows/ci.yml)，包括格式、类型、完整 PostgreSQL 测试和构建。每次 push 到 `main` 都会自动运行 [Deploy production](./.github/workflows/deploy.yml)：GitHub 再次执行完整门禁，构建 `linux/amd64` 镜像并推送到当前仓库的 GHCR，然后把精确 `sha256` digest 交给 Luma；Builder 直接从 `ghcr.io` 拉取该不可变镜像，Luma 继续复用已有应用 secrets 和 manager 本地数据库卷，不再从开发电脑构建或上传镜像。该工作流也支持 `workflow_dispatch` 手动重跑。
+主分支与 Pull Request 会运行 [CI](./.github/workflows/ci.yml)，包括格式、类型、PostgreSQL 测试和构建。每次 push 到 `main` 都会运行 [Deploy production](./.github/workflows/deploy.yml)：门禁通过后，向独立 Builder 提交本次 Git SHA，构建到 ACR；CI 读取真实 digest，生成运行版 Compose，再由 Luma 部署并验证健康。运行时继续复用已有应用 secrets 和 manager 本地数据库卷。该工作流也支持 `workflow_dispatch` 手动重跑。
 
 首次运行前，在 GitHub 仓库配置：
 
@@ -165,7 +165,7 @@ gh workflow run deploy.yml --ref main
 gh run watch
 ```
 
-工作流使用当前运行的短期 `GITHUB_TOKEN` 授权 Luma Builder 读取本次 GHCR 镜像，不把 registry token、Luma token 或运行时 secrets 写入仓库、镜像和部署清单。请先配置上述 variable/secret，再进行第一次 `main` push。
+Builder 保存 GitHub 读取和 ACR Push 凭据，Control 保存 ACR Pull 凭据。工作流只使用 Luma management token，不写入或轮换 Registry 凭据。可选 repository variable `LUMA_BUILD_URL` 默认 `https://build.itool.tech`。
 
 常用检查：
 
@@ -189,3 +189,9 @@ AGENTPOOL_SERVER=https://agentpool.itool.tech pnpm smoke:live
 真实充值/提现上线前仍需要支付渠道、KYC/AML、费率与税务、提现冷却期、争议仲裁、反作弊/关联账户检测和财务对账。当前 `PULSE` 只是演示积分；`ALLOW_DEV_TOPUP=true` 只用于产品体验与端到端验证，所有提现都会返回 `simulated_paid`。
 
 当前执行面本身就是分布式模型：大量独立 Runner 在主人发起的短期 Claim 内，通过无状态 HTTP Lease 并行工作，不需要保持任务长连接。手动领取消除了数万空闲节点持续扫单的必要；若将来并发执行中的 Claim 足以压满单实例 API/数据库，再按真实流量演进队列或分片调度即可，这不改变“主动领一批、Agent 做完即交付、进程退出”的模型。
+
+## 独立 Builder CI
+
+GitHub Actions 只做源码检查和提交构建任务。独立 Builder 从本次 `GITHUB_SHA` 构建 `docker-compose.build.yml`，推送到其配置的 ACR。CI 从成功结果读取 app digest，生成运行版 Compose 后沿用现有 `luma compose deploy`，不把源码构建路径强行写入原部署记录。
+
+需要 repository variable `LUMA_CONTROL_URL`、secret `LUMA_DEPLOY_TOKEN`；`LUMA_BUILD_URL` 默认 `https://build.itool.tech`。Builder 自身配置 GitHub 读取凭据和 ACR Push 凭据，Control 保存 ACR Pull 凭据，CI 不再把短期 GitHub token 写入 Registry 凭据。

@@ -10,11 +10,11 @@ const [
 ] = process.argv;
 
 if (!imageReference) {
-  throw new Error('Usage: node scripts/render-ci-deployment.mjs <ghcr-image@sha256:digest>');
+  throw new Error('Usage: node scripts/render-ci-deployment.mjs <registry-image@sha256:digest>');
 }
 
-if (!/^ghcr\.io\/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$/.test(imageReference)) {
-  throw new Error('The deployment image must be an immutable lowercase GHCR digest reference.');
+if (!/^[a-z0-9.-]+(?::[0-9]+)?\/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$/.test(imageReference)) {
+  throw new Error('The deployment image must be an immutable lowercase registry digest reference.');
 }
 
 for (const output of [composeOutput, sidecarOutput]) {
@@ -52,9 +52,9 @@ if (replacedImages !== 1) {
   throw new Error(`Expected exactly one app image, found ${replacedImages}.`);
 }
 
-const composeDirective = 'compose: docker-compose.deploy.yml';
+const composeDirective = 'compose: docker-compose.build.yml';
 if (sidecarSource.split(composeDirective).length !== 2) {
-  throw new Error('Expected one docker-compose.deploy.yml sidecar reference.');
+  throw new Error('Expected one docker-compose.build.yml sidecar reference.');
 }
 const renderedSidecar = sidecarSource.replace(
   composeDirective,

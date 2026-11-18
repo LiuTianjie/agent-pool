@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: agent-pool-production
@@ -16,7 +15,8 @@ concurrency:
 env:
   LUMA_CONTROL_URL: ${{ vars.LUMA_CONTROL_URL }}
   LUMA_DEPLOY_TOKEN: ${{ secrets.LUMA_DEPLOY_TOKEN }}
-  LUMA_VERSION: 0.1.271
+  LUMA_VERSION: 0.2.79
+  LUMA_BUILD_URL: ${{ vars.LUMA_BUILD_URL || 'https://build.itool.tech' }}
 
 jobs:
   verify-build-deploy:
@@ -54,32 +54,6 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql://agentpool_test:test-only-password@127.0.0.1:5432/agentpool_test
 
-      - name: Resolve GHCR image name
-        id: image
-        shell: bash
-        run: |
-          set -euo pipefail
-          image_name="ghcr.io/${GITHUB_REPOSITORY,,}"
-          echo "name=${image_name}" >> "$GITHUB_OUTPUT"
-          echo "tag=${image_name}:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push image
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.image.outputs.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
       - name: Install Luma CLI
         run: python -m pip install --disable-pip-version-check "luma-infra==${LUMA_VERSION}"
 
@@ -90,24 +64,28 @@ jobs:
           test -n "$LUMA_CONTROL_URL" || { echo "Missing repository variable LUMA_CONTROL_URL" >&2; exit 1; }
           test -n "$LUMA_DEPLOY_TOKEN" || { echo "Missing repository secret LUMA_DEPLOY_TOKEN" >&2; exit 1; }
 
+      - name: Build and push through independent Builder
+        run: |
+          luma builder submit "https://github.com/${GITHUB_REPOSITORY}.git" \
+            --provider-id github:LiuTianjie --ref "$GITHUB_SHA" \
+            --compose-sidecar luma.compose.yml --platform linux/amd64 \
+            --no-deploy --format json > "$RUNNER_TEMP/luma-build.json"
+
       - name: Render immutable deployment
         id: deployment-image
         shell: bash
         run: |
           set -euo pipefail
-          canonical_image="${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}"
-          node scripts/render-ci-deployment.mjs \
-            "$canonical_image"
+          canonical_image="$(node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const payload = JSON.parse(readFileSync(process.argv[1], "utf8"));
+            const build = payload.result?.build;
+            if (!payload.ok || build?.status !== "succeeded" || !build.result?.images?.app)
+              throw new Error("Builder did not return a successful app image");
+            process.stdout.write(build.result.images.app);
+          ' "$RUNNER_TEMP/luma-build.json")"
+          node scripts/render-ci-deployment.mjs "$canonical_image"
           echo "canonical=${canonical_image}" >> "$GITHUB_OUTPUT"
-
-      - name: Authorize Luma to copy the GHCR image
-        shell: bash
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          printf '%s' "$GHCR_TOKEN" | luma registry login ghcr.io \
-            --username "$GITHUB_ACTOR" --password-stdin
 
       - name: Validate Luma deployment
         run: |
